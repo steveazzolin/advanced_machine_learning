@@ -1,0 +1,21 @@
+{
+    "os": "Windows-10-10.0.19041-SP0",
+    "python": "3.7.11",
+    "heartbeatAt": "2022-01-19T21:36:36.125235",
+    "startedAt": "2022-01-19T21:36:33.854041",
+    "docker": null,
+    "gpu": "GeForce GTX 1650",
+    "gpu_count": 1,
+    "cpu_count": 12,
+    "cuda": null,
+    "args": [
+        "--model=GAT",
+        "--wandb"
+    ],
+    "state": "running",
+    "program": "models_CORA.py",
+    "codePath": "models_CORA.py",
+    "host": "LAPTOP-7QOUV6S6",
+    "username": "Steve",
+    "executable": "C:\\Users\\Steve\\anaconda3\\envs\\gnn\\python.exe"
+}
