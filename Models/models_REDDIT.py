@@ -43,7 +43,7 @@ class FrameworkREDDIT(LargeSemiSupFramework):
 
 
 class GCN_REDDIT(torch.nn.Module):
-    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=5e-4, num_epochs=200):
+    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=0, num_epochs=200):
         super().__init__()
 
         self.num_hidden = num_hidden
@@ -99,7 +99,7 @@ class GCN_REDDIT(torch.nn.Module):
 
 
 class SAGE_REDDIT(torch.nn.Module):
-    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=5e-4, num_epochs=200):
+    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=0, num_epochs=200):
         super().__init__()
 
         self.num_hidden = num_hidden
@@ -156,7 +156,7 @@ class GAT_REDDIT(torch.nn.Module):
     """
     Hyper-parameters from https://github.com/gordicaleksa/pytorch-GAT/blob/39c8f0ee634477033e8b1a6e9a6da3c7ed71bbd1/models/definitions/GAT.py#L8
     """
-    def __init__(self, num_features=602, num_hidden=256, num_classes=42, num_heads=[8,1], dropout=0.6, lr=5e-3, wd=5e-4, num_epochs=500):
+    def __init__(self, num_features=602, num_hidden=256, num_classes=42, num_heads=[8,1], dropout=0.6, lr=5e-3, wd=0, num_epochs=500):
         super().__init__()
 
         self.num_hidden = num_hidden
