@@ -120,7 +120,7 @@ if __name__ == "__main__":
         if args.save:
             fw.save_model()
     else:
-        print("Loading prerained model...")
+        print("Loading pretrained model...")
         fw.load_model()
 
     acc , preds , loss = fw.predict(fw.train_loader, fw.dataset.data.test_mask, return_metrics=True)

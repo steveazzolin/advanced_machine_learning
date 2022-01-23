@@ -233,7 +233,7 @@ if __name__ == "__main__":
         if args.save:
             fw.save_model()
     else:
-        print("Loading prerained model...")
+        print("Loading pretrained model...")
         fw.load_model()
 
     kwargs = {'batch_size': 512, 'num_workers': 4, "pin_memory": True}

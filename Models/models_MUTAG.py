@@ -175,7 +175,7 @@ if __name__ == "__main__":
         fw.train(log=True, log_wandb=args.wandb)
         fw.save_model()
     else:
-        print("Loading prerained model...")
+        print("Loading pretrained model...")
         fw.load_model()
 
     acc , _ = fw.predict(fw.test_loader)
