@@ -13,7 +13,7 @@ dataset = Reddit2(root='../../Data/Reddit2') #Planetoid(root=r'C:\Users\Steve\De
 # Already send node features/labels to GPU for faster access during sampling:
 data = dataset[0].to(device, 'x', 'y')
 
-kwargs = {'batch_size': 256, 'num_workers': 6,  'persistent_workers': True}
+kwargs = {'batch_size': 256, 'num_workers': 4,  'persistent_workers': True}
 train_loader    = NeighborLoader(data, input_nodes=data.train_mask, num_neighbors=[25, 10], shuffle=False, **kwargs)
 subgraph_loader = NeighborLoader(copy.copy(data), input_nodes=None, num_neighbors=[-1], shuffle=False, **kwargs)
 

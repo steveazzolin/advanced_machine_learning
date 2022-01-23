@@ -194,7 +194,7 @@ class LargeSemiSupFramework(Framework):
         val_acc = (batch_pred[train_loader.data.val_mask] == train_loader.data.y[train_loader.data.val_mask]).sum() / train_loader.data.val_mask.sum()
         test_acc = (batch_pred[train_loader.data.test_mask] == train_loader.data.y[train_loader.data.test_mask]).sum() / train_loader.data.test_mask.sum()
 
-        return train_acc, val_acc , val_loss , test_acc
+        return train_acc , val_acc , val_loss , test_acc
 
     @torch.no_grad()
     def predict(self, loader, mask=None, return_metrics=False):
