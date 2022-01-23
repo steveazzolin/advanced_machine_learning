@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+import random
 
 class EarlyStopping():    
     def __init__(self, min_delta = 0, patience = 0):        
@@ -19,3 +21,11 @@ class EarlyStopping():
                 self.stopped_epoch = epoch
                 self.stop_training = True
         return self.stop_training
+
+
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)

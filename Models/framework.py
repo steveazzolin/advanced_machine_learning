@@ -28,7 +28,6 @@ class Framework:
     def save_model(self, prefix=""):
         p = self.path + prefix + "_" + self.model.__class__.__name__ + ".pt"
         torch.save(self.model.state_dict(), p)
-        print("Model saved in: ", p)
         
     def load_model(self, prefix=""):        
         self.model.load_state_dict(torch.load(self.path + prefix + "_" + self.model.__class__.__name__ + ".pt"))

@@ -10,6 +10,7 @@ import copy
 
 from framework import LargeSemiSupFramework
 
+import utils
 
 
 class FrameworkREDDIT(LargeSemiSupFramework):
@@ -22,7 +23,10 @@ class FrameworkREDDIT(LargeSemiSupFramework):
         optimizer = model.optimizer
         data = self.dataset[0].to(device, 'x', 'y')
 
-        kwargs = {'batch_size': batch_size, 'num_workers': num_workers,  'persistent_workers': persistent_workers, "pin_memory": True}
+        g = torch.Generator()  #for reproducibility
+        g.manual_seed(42)
+
+        kwargs = {'batch_size': batch_size, 'num_workers': num_workers,  'persistent_workers': persistent_workers, "pin_memory": True, "worker_init_fn": utils.seed_worker, "generator": g}
         train_loader = NeighborLoader(data, input_nodes=self.dataset.data.train_mask, num_neighbors=[25, 10], shuffle=True, **kwargs)
         subgraph_loader = NeighborLoader(copy.copy(data), input_nodes=None, num_neighbors=[-1], shuffle=False, **kwargs)
         print("Dataset loaded")
