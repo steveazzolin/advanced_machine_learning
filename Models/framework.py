@@ -200,7 +200,7 @@ class LargeSemiSupFramework(Framework):
             train_loss.backward()
             self.optimizer.step()
             total_loss += train_loss.detach()      
-        return float(total_loss.item() / len(self.train_loader))
+        return float(total_loss.item())
 
     @torch.no_grad()
     def test(self, train_loader, subgraph_loader):
