@@ -12,7 +12,7 @@ from framework import GraphClassificationFramework
 
 
 class Framework_MUTAG(GraphClassificationFramework):
-    def __init__(self, model, batch_size=256):
+    def __init__(self, model, batch_size):
         self.dataset = TUDataset("../../Data/mutagenicity","Mutagenicity")   
 
         idx = torch.arange(len(self.dataset))
@@ -150,6 +150,8 @@ if __name__ == "__main__":
     parser.add_argument('--model', default="", help='Model to train.')
     parser.add_argument('--wandb', action='store_true', default=False, help='Log training to wandb.')
     parser.add_argument('--train', action='store_true', default=False, help='Train the network from scratch.')
+    parser.add_argument('--save', action='store_true', default=False, help='Save the trained network.')
+    parser.add_argument('--batch_size', default=256, help='Batch size.')
     args = parser.parse_args()
 
     torch.manual_seed(42)
@@ -162,10 +164,11 @@ if __name__ == "__main__":
     else:
         raise ValueError("Model unknown")
 
-    fw = Framework_MUTAG(model=gnn)
+    fw = Framework_MUTAG(model=gnn, batch_size=args.batch_size)
     if args.train:
         fw.train(log=True, log_wandb=args.wandb)
-        fw.save_model()
+        if args.save:
+            fw.save_model()
     else:
         print("Loading pretrained model...")
         fw.load_model()

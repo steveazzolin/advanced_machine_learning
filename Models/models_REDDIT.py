@@ -17,7 +17,7 @@ class FrameworkREDDIT(LargeSemiSupFramework):
     """
         Code partially from https://github.com/pyg-team/pytorch_geometric/blob/master/examples/reddit.py
     """
-    def __init__(self, model, batch_size=256, num_workers=6, persistent_workers=True):        
+    def __init__(self, model, batch_size, num_workers, persistent_workers=True):        
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.dataset = Reddit(root='../../Data/Reddit')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
         optimizer = model.optimizer
@@ -205,22 +205,24 @@ if __name__ == "__main__":
     parser.add_argument('--wandb', action='store_true', default=False, help='Log training to wandb.')
     parser.add_argument('--train', action='store_true', default=False, help='To train the network from scratch.')
     parser.add_argument('--save', action='store_true', default=False, help='Whether to save the trained model or not.')
+    parser.add_argument('--batch_size', default=2048*3, help='Batch size.')  
+    parser.add_argument('--num_workers', default=6, help='Num workers.')
     args = parser.parse_args()
 
     torch.manual_seed(42)
     if args.model == "GCN":
         gnn = GCN_REDDIT(num_epochs=10)
-        bs = 2048*2
+        bs = min(2048*2, args.batch_size)
     elif args.model == "SAGE":
         gnn = SAGE_REDDIT(num_epochs=10)
-        bs = 2048*3
+        bs = min(2048*3, args.batch_size)
     elif args.model == "GAT":
         gnn = GAT_REDDIT(num_epochs=20)
-        bs = 2048*2
+        bs = min(2048*2, args.batch_size)
     else:
         raise ValueError("Model unknown")
 
-    fw = FrameworkREDDIT(model=gnn, batch_size=bs)
+    fw = FrameworkREDDIT(model=gnn, batch_size=bs, num_workers=args.num_workers)
     if args.train:
         fw.train(log=True, log_wandb=args.wandb)
         if args.save:
