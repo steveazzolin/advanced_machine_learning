@@ -151,7 +151,7 @@ if __name__ == "__main__":
     parser.add_argument('--wandb', action='store_true', default=False, help='Log training to wandb.')
     parser.add_argument('--train', action='store_true', default=False, help='Train the network from scratch.')
     parser.add_argument('--save', action='store_true', default=False, help='Save the trained network.')
-    parser.add_argument('--batch_size', default=256, help='Batch size.')
+    parser.add_argument('--batch_size', default=256, help='Batch size.', type=int)
     args = parser.parse_args()
 
     torch.manual_seed(42)
