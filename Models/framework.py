@@ -26,16 +26,16 @@ class Framework:
         self.path = "pretrained/"
 
     def save_model(self, prefix=""):
-        p = self.path + prefix + "_" + self.model.__class__.__name__ + ".pt"
+        p = self.path + prefix + self.model.__class__.__name__ + ".pt"
         torch.save(self.model.state_dict(), p)
         
     def load_model(self, prefix=""):        
-        self.model.load_state_dict(torch.load(self.path + prefix + "_" + self.model.__class__.__name__ + ".pt"))
+        self.model.load_state_dict(torch.load(self.path + prefix + self.model.__class__.__name__ + ".pt"))
         self.model.eval()
 
     def delete_model(self, prefix=""):
         assert prefix != "" , "Can delete just temporary models"
-        p = self.path + prefix + "_" + self.model.__class__.__name__ + ".pt"
+        p = self.path + prefix + self.model.__class__.__name__ + ".pt"
         if os.path.exists(p):
             os.remove(p)
         else:
@@ -88,7 +88,7 @@ class SemiSupFramework(Framework):
             train_acc , val_acc , val_loss , test_acc = self.predict(self.train_loader, is_training=True, return_metrics=True)
             if val_loss <= best_val_loss:
                 best_val_loss = val_loss
-                self.save_model(prefix="best_so_far")
+                self.save_model(prefix="best_so_far_")
             
             if epoch % 10 == 0 and log:
                 self.log(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.3f}, Val Loss: {val_loss:.3f}, Train Acc: {train_acc:.3f} '
@@ -100,8 +100,8 @@ class SemiSupFramework(Framework):
         
         if log_wandb:
             self.stop_logger(run)
-        self.load_model(prefix="best_so_far")
-        #self.delete_model(prefix="best_so_far")
+        self.load_model(prefix="best_so_far_")
+        #self.delete_model(prefix="best_so_far_")
     
     def train_epoch(self):
         assert len(self.train_loader) == 1
@@ -171,7 +171,7 @@ class LargeSemiSupFramework(Framework):
 
             if val_loss <= best_val_loss:
                 best_val_loss = val_loss    
-                self.save_model(prefix="best_so_far")        
+                self.save_model(prefix="best_so_far_")        
             if epoch % 1 == 0 and log:
                 self.log(f'Epoch: {epoch:03d}, Time: {end_time - start_time:.1f} Train Loss: {train_loss:.3f}, Val Loss: {val_loss:.3f}, Train Acc: {train_acc:.3f} Test Acc: {test_acc:.3f} Val Acc: {val_acc:.3f}')
             if log_wandb:
@@ -181,7 +181,7 @@ class LargeSemiSupFramework(Framework):
         
         if log_wandb:
             self.stop_logger(run)
-        self.load_model(prefix="best_so_far")
+        self.load_model(prefix="best_so_far_")
     
     def train_epoch(self):
         self.model.train()    
@@ -246,7 +246,7 @@ class GraphClassificationFramework(Framework):
             if self.val_loader is not None:
                 val_acc , _ , val_loss = self.predict(self.val_loader, predict_type="val", return_loss=True)
                 if val_loss <= best_val_loss:
-                    self.save_model(prefix="best_so_far")
+                    self.save_model(prefix="best_so_far_")
                     best_val_loss = val_loss
 
             if epoch % 10 == 0 and log:
@@ -259,7 +259,7 @@ class GraphClassificationFramework(Framework):
         if log_wandb:
             self.stop_logger(run)
         if self.val_loader is not None:
-            self.load_model(prefix="best_so_far")
+            self.load_model(prefix="best_so_far_")
     
     def train_epoch(self, log):   
         self.model.train()    
