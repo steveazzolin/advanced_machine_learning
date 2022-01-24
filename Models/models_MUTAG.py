@@ -62,8 +62,8 @@ class GCN_MUTAG(torch.nn.Module):
         return {
             "num_hidden": self.num_hidden,
             "dropout": self.dropout,
-            "weight_decay": self.optimizer.param_groups[0]["lr"],
-            "learning_rate": self.optimizer.param_groups[0]["weight_decay"],
+            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
+            "learning_rate": self.optimizer.param_groups[0]["lr"],
             "optimizer": self.optimizer.__class__.__name__,
             "num_epochs": self.num_epochs
         }
@@ -105,8 +105,8 @@ class GAT_MUTAG(torch.nn.Module):
         return {
             "num_hidden": self.num_hidden,
             "dropout": self.dropout,
-            "weight_decay": self.optimizer.param_groups[0]["lr"],
-            "learning_rate": self.optimizer.param_groups[0]["weight_decay"],
+            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
+            "learning_rate": self.optimizer.param_groups[0]["lr"],
             "optimizer": self.optimizer.__class__.__name__,
             "num_epochs": self.num_epochs
         }
@@ -144,8 +144,8 @@ class GraphSAGE_MUTAG(torch.nn.Module):
         return {
             "num_hidden": self.num_hidden,
             "dropout": self.dropout,
-            "weight_decay": self.optimizer.param_groups[0]["lr"],
-            "learning_rate": self.optimizer.param_groups[0]["weight_decay"],
+            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
+            "learning_rate": self.optimizer.param_groups[0]["lr"],
             "optimizer": self.optimizer.__class__.__name__,
             "num_epochs": self.num_epochs
         }

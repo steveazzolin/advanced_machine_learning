@@ -54,8 +54,8 @@ class GCN_CORA(torch.nn.Module):
             "num_hidden": self.num_hidden,
             "dropout": self.dropout,
             "activation": "ReLU",
-            "weight_decay": self.optimizer.param_groups[0]["lr"],
-            "learning_rate": self.optimizer.param_groups[0]["weight_decay"],
+            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
+            "learning_rate": self.optimizer.param_groups[0]["lr"],
             "optimizer": self.optimizer.__class__.__name__,
             "num_epochs": self.num_epochs
         }
@@ -90,8 +90,8 @@ class GAT_CORA(torch.nn.Module):
             "dropout": self.dropout,
             "num_heads": self.num_heads,
             "activation": "ELU",
-            "weight_decay": self.optimizer.param_groups[0]["lr"],
-            "learning_rate": self.optimizer.param_groups[0]["weight_decay"],
+            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
+            "learning_rate": self.optimizer.param_groups[0]["lr"],
             "optimizer": self.optimizer.__class__.__name__,
             "num_epochs": self.num_epochs
         }
