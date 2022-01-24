@@ -52,7 +52,14 @@ class Framework:
                 notes=str(self.model),
                 reinit=True,
                 save_code=True,
-                config=dict (
+                config=dict(
+                    {
+                        "num_hidden": self.num_hidden,
+                        "weight_decay": self.model.optimizer.param_groups[0]["weight_decay"],
+                        "learning_rate": self.model.optimizer.param_groups[0]["lr"],
+                        "optimizer": self.model.optimizer.__class__.__name__,
+                        "num_epochs": self.model.num_epochs,
+                    }
                     **self.model.get_hypers()
                 ))
         wandb.watch(self.model)
@@ -76,7 +83,7 @@ class SemiSupFramework(Framework):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        assert self.train_loader.data.val_mask.sum() > 0 , "This class assumes a validation split"
+        assert self.train_loader.dataset.data.val_mask.sum() > 0 , "This class assumes a validation split"
 
     def train(self, log=False, log_wandb=False):
         if log_wandb:

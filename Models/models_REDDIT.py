@@ -17,9 +17,9 @@ class FrameworkREDDIT(LargeSemiSupFramework):
     """
         Code partially from https://github.com/pyg-team/pytorch_geometric/blob/master/examples/reddit.py
     """
-    def __init__(self, model, batch_size=2048*3, num_workers=6, persistent_workers=True):        
+    def __init__(self, model, batch_size=1024, num_workers=6, persistent_workers=True):        
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.dataset = Reddit(root='../../Data/Reddit')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
+        self.dataset = Reddit2(root='../../Data/Reddit2')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
         optimizer = model.optimizer
         data = self.dataset[0].to(device, 'x', 'y')
 
@@ -43,6 +43,7 @@ class FrameworkREDDIT(LargeSemiSupFramework):
                         semi_sup=True, 
                         val_loader=None,
                         subgraph_loader=subgraph_loader)
+
 
 
 
@@ -91,13 +92,8 @@ class GCN_REDDIT(torch.nn.Module):
     
     def get_hypers(self):
         return {
-            "num_hidden": self.num_hidden,
             "dropout": self.dropout,
             "activation": "ReLU",
-            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
-            "learning_rate": self.optimizer.param_groups[0]["lr"],
-            "optimizer": self.optimizer.__class__.__name__,
-            "num_epochs": self.num_epochs
         }
 
 
@@ -145,13 +141,8 @@ class SAGE_REDDIT(torch.nn.Module):
     
     def get_hypers(self):
         return {
-            "num_hidden": self.num_hidden,
             "dropout": self.dropout,
             "activation": "ReLU",
-            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
-            "learning_rate": self.optimizer.param_groups[0]["lr"],
-            "optimizer": self.optimizer.__class__.__name__,
-            "num_epochs": self.num_epochs
         }
 
 
@@ -201,14 +192,9 @@ class GAT_REDDIT(torch.nn.Module):
 
     def get_hypers(self):
         return {
-            "num_hidden": self.num_hidden,
             "dropout": self.dropout,
             "num_heads": self.num_heads,
             "activation": "ReLU",
-            "weight_decay": self.optimizer.param_groups[0]["weight_decay"],
-            "learning_rate": self.optimizer.param_groups[0]["lr"],
-            "optimizer": self.optimizer.__class__.__name__,
-            "num_epochs": self.num_epochs
         }
 
         
