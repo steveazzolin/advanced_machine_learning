@@ -209,15 +209,18 @@ if __name__ == "__main__":
 
     torch.manual_seed(42)
     if args.model == "GCN":
-        gnn = GCN_REDDIT(num_epochs=1)
+        gnn = GCN_REDDIT(num_epochs=10)
+        bs = 2048*2
     elif args.model == "SAGE":
-        gnn = SAGE_REDDIT(num_epochs=1)
+        gnn = SAGE_REDDIT(num_epochs=10)
+        bs = 2048*3
     elif args.model == "GAT":
         gnn = GAT_REDDIT(num_epochs=20)
+        bs = 2048*2
     else:
         raise ValueError("Model unknown")
 
-    fw = FrameworkREDDIT(model=gnn)
+    fw = FrameworkREDDIT(model=gnn, batch_size=bs)
     if args.train:
         fw.train(log=True, log_wandb=args.wandb)
         if args.save:
