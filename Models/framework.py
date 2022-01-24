@@ -54,7 +54,7 @@ class Framework:
                 save_code=True,
                 config=dict(
                     {
-                        "num_hidden": self.num_hidden,
+                        "num_hidden": self.model.num_hidden,
                         "weight_decay": self.model.optimizer.param_groups[0]["weight_decay"],
                         "learning_rate": self.model.optimizer.param_groups[0]["lr"],
                         "optimizer": self.model.optimizer.__class__.__name__,
