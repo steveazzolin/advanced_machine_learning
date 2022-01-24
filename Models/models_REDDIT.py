@@ -205,7 +205,7 @@ if __name__ == "__main__":
     parser.add_argument('--wandb', action='store_true', default=False, help='Log training to wandb.')
     parser.add_argument('--train', action='store_true', default=False, help='To train the network from scratch.')
     parser.add_argument('--save', action='store_true', default=False, help='Whether to save the trained model or not.')
-    parser.add_argument('--batch_size', default=2048*3, help='Batch size.', type=int)  
+    parser.add_argument('--batch_size', default=512, help='Batch size.', type=int)  
     parser.add_argument('--num_workers', default=6, help='Num workers.')
     args = parser.parse_args()
 
