@@ -19,7 +19,7 @@ class FrameworkREDDIT(LargeSemiSupFramework):
     """
     def __init__(self, model, batch_size=1024, num_workers=6, persistent_workers=True):        
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.dataset = Reddit2(root='../../Data/Reddit2')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
+        self.dataset = Reddit(root='../../Data/Reddit')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
         optimizer = model.optimizer
         data = self.dataset[0].to(device, 'x', 'y')
 
@@ -48,7 +48,7 @@ class FrameworkREDDIT(LargeSemiSupFramework):
 
 
 class GCN_REDDIT(torch.nn.Module):
-    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=0, num_epochs=20):
+    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0, lr=0.01, wd=0, num_epochs=20):
         super().__init__()
 
         self.num_hidden = num_hidden
