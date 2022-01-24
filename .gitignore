@@ -1,0 +1,3 @@
+Models/_pycache_
+Models/wandb
+Models/pretrained/best_so_far**.pt
