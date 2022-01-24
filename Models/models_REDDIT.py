@@ -17,9 +17,9 @@ class FrameworkREDDIT(LargeSemiSupFramework):
     """
         Code partially from https://github.com/pyg-team/pytorch_geometric/blob/master/examples/reddit.py
     """
-    def __init__(self, model, batch_size=1024, num_workers=6, persistent_workers=True):        
+    def __init__(self, model, batch_size=2048*3, num_workers=6, persistent_workers=True):        
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.dataset = Reddit2(root='../../Data/Reddit2')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
+        self.dataset = Reddit(root='../../Data/Reddit')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
         optimizer = model.optimizer
         data = self.dataset[0].to(device, 'x', 'y')
 
