@@ -59,7 +59,7 @@ class Framework:
                         "learning_rate": self.model.optimizer.param_groups[0]["lr"],
                         "optimizer": self.model.optimizer.__class__.__name__,
                         "num_epochs": self.model.num_epochs,
-                    }
+                    },
                     **self.model.get_hypers()
                 ))
         wandb.watch(self.model)
