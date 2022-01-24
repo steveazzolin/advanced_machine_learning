@@ -223,7 +223,7 @@ class LargeSemiSupFramework(Framework):
         out = self.model.inference(loader.data.x, loader, self.device)
         preds = out.argmax(-1).detach()
 
-        acc = float((preds[mask] == loader.data.y[mask]).sum() / mask.sum())
+        acc = float((preds[mask.to(self.device)] == loader.data.y[mask.to(self.device)].to(self.device)).sum() / mask.to(self.device).sum())
         if return_metrics:
             return acc , preds
         else:

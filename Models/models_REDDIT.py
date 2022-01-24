@@ -17,18 +17,18 @@ class FrameworkREDDIT(LargeSemiSupFramework):
     """
         Code partially from https://github.com/pyg-team/pytorch_geometric/blob/master/examples/reddit.py
     """
-    def __init__(self, model, batch_size=1024, num_workers=6, persistent_workers=True):        
+    def __init__(self, model, batch_size=256, num_workers=6, persistent_workers=True):        
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.dataset = Reddit(root='../../Data/Reddit')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
         optimizer = model.optimizer
-        data = self.dataset[0].to(device, 'x', 'y')
+        self.data = self.dataset[0].to(device, 'x', 'y')
 
         g = torch.Generator()  #for reproducibility
         g.manual_seed(42)
 
         kwargs = {'batch_size': batch_size, 'num_workers': num_workers,  'persistent_workers': persistent_workers, "pin_memory": True, "worker_init_fn": utils.seed_worker, "generator": g}
-        train_loader = NeighborLoader(data, input_nodes=self.dataset.data.train_mask, num_neighbors=[25, 10], shuffle=True, **kwargs)
-        subgraph_loader = NeighborLoader(copy.copy(data), input_nodes=None, num_neighbors=[-1], shuffle=False, **kwargs)
+        train_loader = NeighborLoader(self.data, input_nodes=self.dataset.data.train_mask, num_neighbors=[25, 10], shuffle=True, **kwargs)
+        subgraph_loader = NeighborLoader(copy.copy(self.data), input_nodes=None, num_neighbors=[-1], shuffle=False, **kwargs)
         print("Dataset loaded")
         
         del subgraph_loader.data.x , subgraph_loader.data.y
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         bs = 2048*2
     elif args.model == "SAGE":
         gnn = SAGE_REDDIT(num_epochs=10)
-        bs = 2048*2
+        bs = 2048*3
     elif args.model == "GAT":
         gnn = GAT_REDDIT(num_epochs=20)
         bs = 2048*2
@@ -229,8 +229,9 @@ if __name__ == "__main__":
         print("Loading pretrained model...")
         fw.load_model()
 
-    kwargs = {'batch_size': 512, 'num_workers': 4, "pin_memory": True}
-    tmp = NeighborLoader(copy.copy(fw.train_loader.data), input_nodes=None, num_neighbors=[-1], **kwargs)
+    del fw.train_loader, fw.subgraph_loader
+    kwargs = {'batch_size': 256, 'num_workers': 0, "pin_memory": True}
+    tmp = NeighborLoader(fw.dataset.data, input_nodes=None, num_neighbors=[-1], **kwargs)
     tmp.data.n_id = torch.arange(tmp.data.num_nodes)
     acc , _ = fw.predict(tmp, mask=tmp.data.test_mask, return_metrics=True)
     print("Test accuracy: ", acc)
