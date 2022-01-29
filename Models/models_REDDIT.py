@@ -8,10 +8,24 @@ from torch_geometric.loader import DataLoader, NeighborLoader
 import argparse
 import copy
 
-from framework import LargeSemiSupFramework
+try:
+    from .framework import LargeSemiSupFramework
+    from . import utils
+except ImportError:
+    from framework import LargeSemiSupFramework
+    import utils
 
-import utils
 
+
+
+def getFrameworkByName(model_name):
+    if model_name == "GCN":
+        ret = FrameworkREDDIT(model=GCN_REDDIT())
+    if model_name == "SAGE":
+        ret = FrameworkREDDIT(model=SAGE_REDDIT())
+    elif model_name == "GAT":
+        ret = FrameworkREDDIT(model=GAT_REDDIT())
+    return ret
 
 class FrameworkREDDIT(LargeSemiSupFramework):
     """
@@ -48,7 +62,7 @@ class FrameworkREDDIT(LargeSemiSupFramework):
 
 
 class GCN_REDDIT(torch.nn.Module):
-    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=0, num_epochs=20):
+    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=0, num_epochs=10):
         super().__init__()
 
         self.num_hidden = num_hidden
@@ -62,7 +76,8 @@ class GCN_REDDIT(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, x, edge_index, batch=None):
+    def forward(self, data):
+        x , edge_index = data.x, data.edge_index.to(self.device)
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
             if i < len(self.convs) - 1:
@@ -99,7 +114,7 @@ class GCN_REDDIT(torch.nn.Module):
 
 
 class SAGE_REDDIT(torch.nn.Module):
-    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=0, num_epochs=20):
+    def __init__(self, num_in_features=602, num_hidden=256, num_classes=42, dropout=0.5, lr=0.01, wd=0, num_epochs=10):
         super().__init__()
 
         self.num_hidden = num_hidden
@@ -113,7 +128,8 @@ class SAGE_REDDIT(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, x, edge_index, batch=None):
+    def forward(self, data):
+        x , edge_index = data.x, data.edge_index.to(self.device)
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
             if i < len(self.convs) - 1:

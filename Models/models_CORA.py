@@ -7,13 +7,23 @@ from torch_geometric.datasets import Planetoid
 from torch_geometric.loader import DataLoader
 import argparse
 
-from framework import SemiSupFramework
+try:
+    from .framework import SemiSupFramework
+except ImportError:
+    from framework import SemiSupFramework
 
+
+def getFrameworkByName(model_name):
+    if model_name == "GCN":
+        ret = FrameworkCORA(model=GCN_CORA())
+    elif model_name == "GAT":
+        ret = FrameworkCORA(model=GAT_CORA())
+    return ret
 
 
 class FrameworkCORA(SemiSupFramework):
     def __init__(self, model, batch_size=1):        
-        self.dataset = Planetoid("../../Data/Cora","Cora")        
+        self.dataset = Planetoid(self.get_data_path() + "Cora","Cora")        
         optimizer = model.optimizer
 
         train_loader = DataLoader(self.dataset, batch_size=batch_size)
@@ -43,7 +53,8 @@ class GCN_CORA(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, x, edge_index, batch=None):
+    def forward(self, data):
+        x, edge_index = data.x , data.edge_index
         x = F.relu(self.gc1(x, edge_index))
         x = self.dropout(x)
         x = self.gc2(x, edge_index)
@@ -74,7 +85,8 @@ class GAT_CORA(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, x, edge_index, batch=None):
+    def forward(self, data):
+        x, edge_index = data.x , data.edge_index
         x = F.elu(self.conv1(x, edge_index))
         x = self.conv2(x, edge_index)
         return F.log_softmax(x, dim=-1)
@@ -98,9 +110,9 @@ if __name__ == "__main__":
 
     torch.manual_seed(42)
     if args.model == "GCN":
-        gnn = GCN_CORA(num_epochs=200)
+        gnn = GCN_CORA()
     elif args.model == "GAT":
-        gnn = GAT_CORA(num_epochs=500)
+        gnn = GAT_CORA()
     else:
         raise ValueError("Model unknown")
 

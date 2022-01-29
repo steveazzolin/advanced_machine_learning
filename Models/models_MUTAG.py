@@ -8,7 +8,18 @@ from torch_geometric.datasets import TUDataset
 from torch_geometric.loader import DataLoader
 import argparse
 
-from framework import GraphClassificationFramework
+try:
+    from .framework import GraphClassificationFramework
+except ImportError:
+    from framework import GraphClassificationFramework
+
+
+def getFrameworkByName(model_name):
+    if model_name == "GCN":
+        ret = Framework_MUTAG(model=GCN_MUTAG())
+    elif model_name == "GAT":
+        ret = Framework_MUTAG(model=GAT_MUTAG())
+    return ret
 
 
 class Framework_MUTAG(GraphClassificationFramework):
@@ -47,7 +58,8 @@ class GCN_MUTAG(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd)
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, data):
+        x, edge_index, batch = data.x , data.edge_index , data.batch
         x = F.relu(self.conv1(x, edge_index))
         x = self.dropouts[0](x)
         x = F.relu(self.conv2(x, edge_index))
@@ -89,7 +101,8 @@ class GAT_MUTAG(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, data):
+        x, edge_index, batch = data.x , data.edge_index , data.batch
         x = F.relu(self.conv1(x, edge_index))
         x = self.dropouts[0](x)
         x = F.relu(self.conv2(x, edge_index))
@@ -125,7 +138,8 @@ class GraphSAGE_MUTAG(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, data):
+        x, edge_index, batch = data.x , data.edge_index , data.batch
         x = F.relu(self.conv1(x, edge_index))
         x = self.dropouts[0](x)
         x = F.relu(self.conv2(x, edge_index))

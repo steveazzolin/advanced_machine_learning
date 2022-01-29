@@ -9,7 +9,13 @@ import copy
 import time
 import os
 
-from utils import EarlyStopping
+try:
+    from .utils import EarlyStopping
+except ImportError:
+    from utils import EarlyStopping
+
+
+DATA_PATH = "C:/Users/Steve/Desktop/GNN/Data/"
 
 
 class Framework:
@@ -24,6 +30,10 @@ class Framework:
         self.test_loader = test_loader
         self.val_loader = val_loader
         self.path = "pretrained/"
+
+    @staticmethod
+    def get_data_path():
+        return DATA_PATH
 
     def save_model(self, prefix=""):
         p = self.path + prefix + self.model.__class__.__name__ + ".pt"
@@ -118,7 +128,7 @@ class SemiSupFramework(Framework):
         for data in self.train_loader:
             data = data.to(self.device)
             self.optimizer.zero_grad()
-            output = self.model(data.x, data.edge_index)
+            output = self.model(data)
             train_loss = F.nll_loss(output[data.train_mask], data.y[data.train_mask])
             train_loss.backward()
             self.optimizer.step()      
@@ -133,7 +143,7 @@ class SemiSupFramework(Framework):
         preds = []
         for data in loader:
             data = data.to(self.device)
-            out = self.model(data.x, data.edge_index, data.batch)
+            out = self.model(data)
             batch_pred = out.argmax(-1).detach()
             preds.extend(batch_pred[mask].cpu().tolist())
 
@@ -195,7 +205,7 @@ class LargeSemiSupFramework(Framework):
         total_loss = 0 
         for data in self.train_loader:
             self.optimizer.zero_grad()
-            output = self.model(data.x, data.edge_index.to(self.device))[:data.batch_size]
+            output = self.model(data)[:data.batch_size]
             train_loss = F.nll_loss(output, data.y[:data.batch_size])
             train_loss.backward()
             self.optimizer.step()
@@ -274,7 +284,7 @@ class GraphClassificationFramework(Framework):
         for data in self.train_loader:
             data = data.to(self.device)
             self.optimizer.zero_grad()
-            output = self.model(data.x, data.edge_index, data.batch)
+            output = self.model(data)
             loss = F.nll_loss(output, data.y)
             loss.backward()
             self.optimizer.step()
@@ -290,7 +300,7 @@ class GraphClassificationFramework(Framework):
         preds = []
         for data in loader:
             data = data.to(self.device)
-            out = self.model(data.x, data.edge_index, data.batch)
+            out = self.model(data)
             
             batch_pred = out.argmax(-1).detach()                        
             total_correct += int((batch_pred == data.y).sum()) 
