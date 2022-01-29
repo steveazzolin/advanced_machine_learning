@@ -40,7 +40,7 @@ class Framework:
         torch.save(self.model.state_dict(), p)
         
     def load_model(self, prefix=""):        
-        self.model.load_state_dict(torch.load(self.path + prefix + self.model.__class__.__name__ + ".pt"))
+        self.model.load_state_dict(torch.load(self.path + prefix + self.model.__class__.__name__ + ".pt", map_location=self.device))
         self.model.eval()
 
     def delete_model(self, prefix=""):
