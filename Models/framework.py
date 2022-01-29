@@ -64,12 +64,12 @@ class Framework:
                 save_code=True,
                 config=dict(
                     {
-                        "num_hidden": self.num_hidden,
+                        "num_hidden": self.model.num_hidden,
                         "weight_decay": self.model.optimizer.param_groups[0]["weight_decay"],
                         "learning_rate": self.model.optimizer.param_groups[0]["lr"],
                         "optimizer": self.model.optimizer.__class__.__name__,
                         "num_epochs": self.model.num_epochs,
-                    }
+                    },
                     **self.model.get_hypers()
                 ))
         wandb.watch(self.model)
@@ -210,7 +210,7 @@ class LargeSemiSupFramework(Framework):
             train_loss.backward()
             self.optimizer.step()
             total_loss += train_loss.detach()      
-        return float(total_loss.item() / len(self.train_loader))
+        return float(total_loss.item())
 
     @torch.no_grad()
     def test(self, train_loader, subgraph_loader):
