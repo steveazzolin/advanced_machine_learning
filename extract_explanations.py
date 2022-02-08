@@ -6,13 +6,19 @@ from os.path import isfile, join
 import Models.models_CORA as models_CORA
 import Models.models_MUTAG as models_MUTAG
 import Models.models_REDDIT as models_REDDIT
+import Models.models_BAshapes as models_BAshapes
 
-from Explainers.explainers import SemiSupSubGraphX
+from Explainers.explainers import SemiSupSubGraphX, SemiSupPGExplainer
 
 
 def explain_SubGraphX(model, dataset, dataset_name, model_name):
     fw = SemiSupSubGraphX(model, dataset, dataset_name, model_name)
     fw.explain(max_nodes=10)
+
+
+def explain_PGExplainer(framework, dataset_name, model_name, save):
+    fw = SemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=3, num_hops=3)
+    fw.explain(top_k=5, save=save)
 
 
 
@@ -21,12 +27,14 @@ if __name__ == "__main__":
     parser.add_argument('--model', default="", help='Model to use for explanations.')
     parser.add_argument('--dataset', default="", help='Dataset to explain.')
     parser.add_argument('--expl', default="", help='Explainer to use.')
+    parser.add_argument('--save', action='store_true', default=False, help='Whether to save the trained model or not.')
     args = parser.parse_args()
+    print(f"You are {'not' if not args.save else ''} saving the result")
 
     torch.manual_seed(42)
 
-    pretrained_models = [f.split(".")[0] for f in listdir("Models/pretrained") if isfile(join("Models/pretrained", f))]
-    explainers = ["subgraphx"]
+    pretrained_models = [f.split(".")[0] for f in listdir("Pretrained models") if isfile(join("Pretrained models", f))]
+    explainers = ["subgraphx", "pgexplainer"]
     
     assert args.model + "_" + args.dataset in pretrained_models , "Model not yet implemented or trained"
     assert args.expl.lower() in explainers , "Explainer not yet implemented"
@@ -38,7 +46,11 @@ if __name__ == "__main__":
         fw = models_MUTAG.getFrameworkByName(args.model.upper())
     elif args.dataset.upper() == "REDDIT":
         fw = models_REDDIT.getFrameworkByName(args.model.upper())
+    elif args.dataset.upper() == "BASHAPES":
+        fw = models_BAshapes.getFrameworkByName(args.model.upper())
+    fw.load_model()
 
-    if args.expl == "subgraphx":
+    if args.expl.lower() == "subgraphx":
         explain_SubGraphX(fw.model, fw.dataset, args.dataset.upper(), args.model.upper())
-    
+    elif args.expl.lower() == "pgexplainer":
+        explain_PGExplainer(fw, args.dataset.upper(), args.model.upper(), args.save)
