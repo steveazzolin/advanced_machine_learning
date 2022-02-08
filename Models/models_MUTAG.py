@@ -178,7 +178,7 @@ if __name__ == "__main__":
     else:
         raise ValueError("Model unknown")
 
-    fw = Framework_MUTAG(model=gnn, batch_size=args.batch_size)
+    fw = Framework_MUTAG(model=gnn, batch_size=args.batch_size, main=True)
     if args.train:
         fw.train(log=True, log_wandb=args.wandb)
         if args.save:

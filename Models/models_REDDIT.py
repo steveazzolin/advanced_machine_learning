@@ -238,7 +238,7 @@ if __name__ == "__main__":
     else:
         raise ValueError("Model unknown")
 
-    fw = FrameworkREDDIT(model=gnn, batch_size=bs, num_workers=args.num_workers)
+    fw = FrameworkREDDIT(model=gnn, batch_size=bs, num_workers=args.num_workers, main=True)
     if args.train:
         fw.train(log=True, log_wandb=args.wandb)
         if args.save:
