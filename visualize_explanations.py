@@ -131,6 +131,9 @@ def plot_k_per_class(expls, labels, k):
     plt.show()
 
 
+def get_last_experiment(path):
+    return sorted([f for f in os.listdir(path)])[-1]
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', default="", help='Model to use for explanations.')
@@ -159,7 +162,11 @@ if __name__ == "__main__":
     elif args.dataset.upper() == "BASHAPES":
         fw = models_BAshapes.getFrameworkByName(args.model.upper())
 
-    path = f"Explanations/{args.expl}/{args.dataset}/{args.model}/{args.time}"
+    path = f"Explanations/{args.expl}/{args.dataset}/{args.model}/"
+    if args.time == "":
+        args.time = get_last_experiment(path)
+        print("Reading: ", args.time)
+    path += str(args.time)
 
     expls = read_explanations(path, divide_per_split=False)
     expls = process_explanations(expls, cut_edges=args.cut_edges, cut_cc=args.cut_cc)
