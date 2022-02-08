@@ -46,31 +46,32 @@ class FrameworkCORA(SemiSupFramework):
 
 
 class GCN_CORA(torch.nn.Module):
-    def __init__(self, num_in_features=1433, num_hidden=16, num_classes=7, dropout=0.5, lr=0.01, wd=5e-4, num_epochs=200):
+    def __init__(self, num_in_features=1433, num_hidden=80, num_classes=7, dropout=0.5, lr=0.01, wd=5e-4, num_epochs=200):
         super().__init__()
 
         self.num_hidden = num_hidden
         self.num_epochs = num_epochs
         self.dropout = dropout
+        self.dim_embedding = num_hidden
 
         self.gc1 = GCNConvMask(num_in_features, num_hidden)
-        self.gc2 = GCNConvMask(num_hidden, num_classes)
+        self.gc2 = GCNConvMask(num_hidden, num_hidden)
         self.dropout = nn.Dropout(dropout)
+        self.lin = nn.Linear(num_hidden, num_classes)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
     def forward(self, data):
-        x, edge_index = data.x , data.edge_index
-        x = F.relu(self.gc1(x, edge_index))
-        x = self.dropout(x)
-        x = self.gc2(x, edge_index)
+        x = self.get_emb(data)
+        x = self.lin(x)
         return F.log_softmax(x, dim=1)
 
     def get_emb(self, data):
         x, edge_index = data.x , data.edge_index
         x = F.relu(self.gc1(x, edge_index))
         x = self.dropout(x)
-        x = self.gc2(x, edge_index)
+        x = F.relu(self.gc2(x, edge_index))
+        x = self.dropout(x)
         return x
     
     def get_hypers(self):
