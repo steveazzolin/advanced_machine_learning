@@ -1,3 +1,4 @@
 Models/__pycache__/*
 Models/wandb
-Pretrained models/best_so_far*.pt
+Pretrained models/best_so_far*
+Pretrained models/best_so_far_GCN_BAShapes.pt
