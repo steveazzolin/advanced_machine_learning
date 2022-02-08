@@ -87,23 +87,24 @@ class GAT_CORA(torch.nn.Module):
     """
     Hyper-parameters from https://github.com/gordicaleksa/pytorch-GAT/blob/39c8f0ee634477033e8b1a6e9a6da3c7ed71bbd1/models/definitions/GAT.py#L8
     """
-    def __init__(self, num_features=1433, num_hidden=8, num_classes=7, num_heads=[8,1], dropout=0.6, lr=5e-3, wd=5e-4, num_epochs=500):
+    def __init__(self, num_features=1433, num_hidden=8*5, num_classes=7, num_heads=[4,4], dropout=0.6, lr=5e-3, wd=5e-4, num_epochs=500):
         super().__init__()
 
         self.num_hidden = num_hidden
         self.dropout = dropout
         self.num_heads = num_heads
         self.num_epochs = num_epochs
+        self.dim_embedding = num_hidden*num_heads[0]
 
         self.conv1 = GATConvMask(num_features, num_hidden, heads=num_heads[0], dropout=dropout, concat=True)
-        self.conv2 = GATConvMask(num_hidden*num_heads[0], num_classes, heads=num_heads[1], dropout=dropout, concat=False)
+        self.conv2 = GATConvMask(num_hidden*num_heads[0], num_hidden*num_heads[0], heads=num_heads[1], dropout=dropout, concat=False)
+        self.lin = nn.Linear(num_hidden*num_heads[0], num_classes)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
     def forward(self, data):
-        x, edge_index = data.x , data.edge_index
-        x = F.elu(self.conv1(x, edge_index))
-        x = self.conv2(x, edge_index)
+        x = self.get_emb(data)
+        x = self.lin(x)
         return F.log_softmax(x, dim=-1)
 
     def get_hypers(self):
@@ -116,7 +117,7 @@ class GAT_CORA(torch.nn.Module):
     def get_emb(self, data):
         x, edge_index = data.x , data.edge_index
         x = F.elu(self.conv1(x, edge_index))
-        x = self.conv2(x, edge_index)
+        x = F.elu(self.conv2(x, edge_index))
         return x
 
         
