@@ -9,8 +9,13 @@ import argparse
 
 try:
     from .framework import SemiSupFramework
+    from .pyg_model_mask import GCNConvMask, GATConvMask
 except ImportError:
     from framework import SemiSupFramework
+    from pyg_model_mask import GCNConvMask, GATConvMask
+
+
+
 
 
 def getFrameworkByName(model_name):
@@ -22,7 +27,7 @@ def getFrameworkByName(model_name):
 
 
 class FrameworkCORA(SemiSupFramework):
-    def __init__(self, model, batch_size=1):        
+    def __init__(self, model, batch_size=1, main=False):        
         self.dataset = Planetoid(self.get_data_path() + "Cora","Cora")        
         optimizer = model.optimizer
 
@@ -36,7 +41,8 @@ class FrameworkCORA(SemiSupFramework):
                         optimizer=optimizer, 
                         num_epochs=model.num_epochs, 
                         semi_sup=True, 
-                        val_loader=val_loader)
+                        val_loader=val_loader,
+                        main=main)
 
 
 class GCN_CORA(torch.nn.Module):
@@ -47,8 +53,8 @@ class GCN_CORA(torch.nn.Module):
         self.num_epochs = num_epochs
         self.dropout = dropout
 
-        self.gc1 = GCNConv(num_in_features, num_hidden)
-        self.gc2 = GCNConv(num_hidden, num_classes)
+        self.gc1 = GCNConvMask(num_in_features, num_hidden)
+        self.gc2 = GCNConvMask(num_hidden, num_classes)
         self.dropout = nn.Dropout(dropout)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
@@ -59,12 +65,20 @@ class GCN_CORA(torch.nn.Module):
         x = self.dropout(x)
         x = self.gc2(x, edge_index)
         return F.log_softmax(x, dim=1)
+
+    def get_emb(self, data):
+        x, edge_index = data.x , data.edge_index
+        x = F.relu(self.gc1(x, edge_index))
+        x = self.dropout(x)
+        x = self.gc2(x, edge_index)
+        return x
     
     def get_hypers(self):
         return {
             "dropout": self.dropout,
             "activation": "ReLU",
         }
+
 
 
 
@@ -80,8 +94,8 @@ class GAT_CORA(torch.nn.Module):
         self.num_heads = num_heads
         self.num_epochs = num_epochs
 
-        self.conv1 = GATConv(num_features, num_hidden, heads=num_heads[0], dropout=dropout, concat=True)
-        self.conv2 = GATConv(num_hidden*num_heads[0], num_classes, heads=num_heads[1], dropout=dropout, concat=False)
+        self.conv1 = GATConvMask(num_features, num_hidden, heads=num_heads[0], dropout=dropout, concat=True)
+        self.conv2 = GATConvMask(num_hidden*num_heads[0], num_classes, heads=num_heads[1], dropout=dropout, concat=False)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
@@ -97,6 +111,12 @@ class GAT_CORA(torch.nn.Module):
             "num_heads": self.num_heads,
             "activation": "ELU",
         }
+
+    def get_emb(self, data):
+        x, edge_index = data.x , data.edge_index
+        x = F.elu(self.conv1(x, edge_index))
+        x = self.conv2(x, edge_index)
+        return x
 
         
 
@@ -116,7 +136,7 @@ if __name__ == "__main__":
     else:
         raise ValueError("Model unknown")
 
-    fw = FrameworkCORA(model=gnn)
+    fw = FrameworkCORA(model=gnn, main=True)
     if args.train:
         fw.train(log=True, log_wandb=args.wandb)
         if args.save:
