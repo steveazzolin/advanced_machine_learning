@@ -19,7 +19,7 @@ DATA_PATH = "C:/Users/Steve/Desktop/GNN/Data/"
 
 
 class Framework:
-    def __init__(self, model, train_loader, test_loader, optimizer, num_epochs, semi_sup, val_loader=None):
+    def __init__(self, model, train_loader, test_loader, optimizer, num_epochs, semi_sup, val_loader=None, main=False):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         self.model = model.to(self.device)
@@ -29,7 +29,10 @@ class Framework:
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.val_loader = val_loader
-        self.path = "pretrained/"
+        if main:
+            self.path = "../Pretrained models/"
+        else:
+            self.path = "Pretrained models/"
 
     @staticmethod
     def get_data_path():
@@ -95,7 +98,7 @@ class SemiSupFramework(Framework):
         super().__init__(**kwargs)
         assert self.train_loader.dataset.data.val_mask.sum() > 0 , "This class assumes a validation split"
 
-    def train(self, log=False, log_wandb=False):
+    def train(self, compute=True, log=False, log_wandb=False):
         if log_wandb:
             run = self.init_logger()
 
@@ -135,17 +138,18 @@ class SemiSupFramework(Framework):
         return train_loss.item()
 
     @torch.no_grad()
-    def predict(self, loader, mask=None, is_training=False, return_metrics=False):
+    def predict(self, loader, mask=None, is_training=False, return_metrics=False, return_logits=False):
         assert len(self.train_loader) == 1
 
         self.model.eval()
         total_correct = 0 
-        preds = []
+        preds , logits = [] , []
         for data in loader:
             data = data.to(self.device)
             out = self.model(data)
             batch_pred = out.argmax(-1).detach()
             preds.extend(batch_pred[mask].cpu().tolist())
+            logits.extend(out[mask].cpu().tolist())
 
             if return_metrics:
                 if is_training:
@@ -161,10 +165,25 @@ class SemiSupFramework(Framework):
             if is_training:
                 return train_acc, val_acc , val_loss , test_acc
             else:
-                acc = total_correct / len(preds)
+                acc = total_correct / (len(preds) + 1e-9)
                 return acc , preds , loss
         else:
-            return preds
+            if return_logits:
+                return preds , torch.tensor(logits)
+            else:
+                return preds
+
+    @torch.no_grad()
+    def get_embd(self, loader):
+        assert len(self.train_loader) == 1
+
+        self.model.eval()
+        ret = []
+        for data in loader:
+            data = data.to(self.device)
+            out = self.model.get_emb(data)
+            ret.extend(out.cpu().tolist())
+        return ret
 
 
 class LargeSemiSupFramework(Framework):
