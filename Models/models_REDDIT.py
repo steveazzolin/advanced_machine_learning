@@ -18,22 +18,22 @@ except ImportError:
 
 
 
-def getFrameworkByName(model_name):
+def getFrameworkByName(model_name, batch_size, num_workers):
     if model_name == "GCN":
-        ret = FrameworkREDDIT(model=GCN_REDDIT())
+        ret = FrameworkREDDIT(model=GCN_REDDIT(), batch_size=batch_size, num_workers=num_workers)
     if model_name == "SAGE":
-        ret = FrameworkREDDIT(model=SAGE_REDDIT())
+        ret = FrameworkREDDIT(model=SAGE_REDDIT(), batch_size=batch_size, num_workers=num_workers)
     elif model_name == "GAT":
-        ret = FrameworkREDDIT(model=GAT_REDDIT())
+        ret = FrameworkREDDIT(model=GAT_REDDIT(), batch_size=batch_size, num_workers=num_workers)
     return ret
 
 class FrameworkREDDIT(LargeSemiSupFramework):
     """
         Code partially from https://github.com/pyg-team/pytorch_geometric/blob/master/examples/reddit.py
     """
-    def __init__(self, model, batch_size, num_workers, persistent_workers=True):        
+    def __init__(self, model, batch_size, num_workers, persistent_workers=True, main=False):        
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.dataset = Reddit(root='../../Data/Reddit')  #Planetoid(root=r'../../Data/Cora', name='Cora') 
+        self.dataset = Reddit(self.get_data_path() + "Reddit")  #Planetoid(root=r'../../Data/Cora', name='Cora') 
         optimizer = model.optimizer
         self.data = self.dataset[0].to(device, 'x', 'y')
 
@@ -56,7 +56,8 @@ class FrameworkREDDIT(LargeSemiSupFramework):
                         num_epochs=model.num_epochs, 
                         semi_sup=True, 
                         val_loader=None,
-                        subgraph_loader=subgraph_loader)
+                        subgraph_loader=subgraph_loader,
+                        main=main)
 
 
 
@@ -68,6 +69,7 @@ class GCN_REDDIT(torch.nn.Module):
         self.num_hidden = num_hidden
         self.num_epochs = num_epochs
         self.dropout = dropout
+        self.dim_embedding = num_classes
 
         self.convs = torch.nn.ModuleList()
         self.convs.append(GCNConv(num_in_features, num_hidden))
@@ -76,13 +78,17 @@ class GCN_REDDIT(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, data):
-        x , edge_index = data.x, data.edge_index.to(self.device)
+    def get_emb(self, data, device):
+        x , edge_index = data.x, data.edge_index.to(device)
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
             if i < len(self.convs) - 1:
                 x = x.relu_()
                 x = self.dropout(x)
+        return x
+
+    def forward(self, data, device):
+        x = self.get_emb(data, device)        
         return F.log_softmax(x, dim=1)
 
     @torch.no_grad()
@@ -120,6 +126,7 @@ class SAGE_REDDIT(torch.nn.Module):
         self.num_hidden = num_hidden
         self.num_epochs = num_epochs
         self.dropout = dropout
+        self.dim_embedding = num_classes
 
         self.convs = torch.nn.ModuleList()
         self.convs.append(SAGEConv(num_in_features, num_hidden))
@@ -128,13 +135,17 @@ class SAGE_REDDIT(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, data):
+    def get_emb(self, data):
         x , edge_index = data.x, data.edge_index.to(self.device)
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
             if i < len(self.convs) - 1:
                 x = x.relu_()
                 x = self.dropout(x)
+        return x
+
+    def forward(self, data):
+        x = self.get_emb(data)        
         return F.log_softmax(x, dim=1)
 
     @torch.no_grad()
@@ -174,6 +185,7 @@ class GAT_REDDIT(torch.nn.Module):
         self.dropout = dropout
         self.num_heads = num_heads
         self.num_epochs = num_epochs
+        self.dim_embedding = num_classes
 
         self.convs = torch.nn.ModuleList()
         self.convs.append(GATConv(num_features, num_hidden, heads=num_heads[0], dropout=dropout, concat=True))
@@ -181,11 +193,17 @@ class GAT_REDDIT(torch.nn.Module):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd) 
 
-    def forward(self, x, edge_index, batch=None):
+    def get_emb(self, data):
+        x , edge_index = data.x, data.edge_index.to(self.device)
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
             if i < len(self.convs) - 1:
                 x = x.relu_()
+                x = self.dropout(x)
+        return x
+
+    def forward(self, data):
+        x = self.get_emb(data)        
         return F.log_softmax(x, dim=1)
 
     @torch.no_grad()

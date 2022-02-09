@@ -8,7 +8,7 @@ import Models.models_MUTAG as models_MUTAG
 import Models.models_REDDIT as models_REDDIT
 import Models.models_BAshapes as models_BAshapes
 
-from Explainers.explainers import SemiSupSubGraphX, SemiSupPGExplainer
+from Explainers.explainers import * #SemiSupSubGraphX, SemiSupPGExplainer, LargeSemiSupPGExplainer
 
 
 def explain_SubGraphX(model, dataset, dataset_name, model_name):
@@ -17,7 +17,8 @@ def explain_SubGraphX(model, dataset, dataset_name, model_name):
 
 
 def explain_PGExplainer(framework, dataset_name, model_name, save):
-    fw = SemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=20, num_hops=3)
+    #fw = SemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=20, num_hops=3)
+    fw = LargeSemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=3, num_hops=3)
     fw.explain(top_k=5, save=save)
 
 
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     parser.add_argument('--expl', default="", help='Explainer to use.')
     parser.add_argument('--save', action='store_true', default=False, help='Whether to save the trained model or not.')
     args = parser.parse_args()
-    print(f"You are {'not' if not args.save else ''} saving the result")
+    print(f"You are{' not' if not args.save else ''} saving the result")
 
     torch.manual_seed(42)
 
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     elif args.dataset.upper() == "MUTAG":
         fw = models_MUTAG.getFrameworkByName(args.model.upper())
     elif args.dataset.upper() == "REDDIT":
-        fw = models_REDDIT.getFrameworkByName(args.model.upper())
+        fw = models_REDDIT.getFrameworkByName(args.model.upper(), batch_size=512, num_workers=4)
     elif args.dataset.upper() == "BASHAPES":
         fw = models_BAshapes.getFrameworkByName(args.model.upper())
     fw.load_model()
