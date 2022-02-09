@@ -4,10 +4,12 @@ import torch.nn as nn
 
 from sklearn.model_selection import train_test_split
 
+from networkx import average_neighbor_degree, closeness_centrality, betweenness_centrality, clustering
+
 from torch_geometric.nn import GCNConv, GATConv, SAGEConv
 from torch_geometric.datasets import BAShapes
 from torch_geometric.loader import DataLoader
-from torch_geometric.utils import degree
+from torch_geometric.utils import degree, to_networkx
 import argparse
 
 try:
@@ -44,10 +46,21 @@ class FrameworkBAShapes(SemiSupFramework):
         self.dataset.data.val_mask[val_idx] = True
         self.dataset.data.test_mask[test_idx] = True
 
-        self.dataset.data.x[:, 0] = degree(self.dataset.data.edge_index[:,0], num_nodes=self.dataset.data.num_nodes) # otherways trainig fails with GAT, due to the features all having the same value
-        self.dataset.data.x[:, 1] = self.dataset.data.x[:, 0]
-        self.dataset.data.x[:, 2] = self.dataset.data.x[:, 0]
-        self.dataset.data.x = self.dataset.data.x[:, :3]
+        if "GAT" in model.__class__.__name__:
+            # extract node features
+            # otherways trainig fails with GAT, due to the features all having the same value
+            g = to_networkx(self.dataset.data)
+            neig_deg = average_neighbor_degree(g)
+            close = closeness_centrality(g)
+            betwe = betweenness_centrality(g)
+            clust = clustering(g)
+
+            self.dataset.data.x[:, 0] = torch.tensor(list(neig_deg.values())) #degree(self.dataset.data.edge_index[:,0], num_nodes=self.dataset.data.num_nodes)
+            self.dataset.data.x[:, 1] = torch.tensor(list(close.values()))
+            self.dataset.data.x[:, 2] = torch.tensor(list(betwe.values()))
+            self.dataset.data.x[:, 3] = torch.tensor(list(clust.values()))
+            self.dataset.data.x = self.dataset.data.x[:, :4]
+            del g
 
 
         train_loader = DataLoader(self.dataset, batch_size=batch_size)
@@ -109,7 +122,7 @@ class GCN_BAShapes(torch.nn.Module):
 
 
 class GAT_BAShapes(torch.nn.Module):
-    def __init__(self, num_features=3, num_hidden=25, num_classes=4, num_heads=[1,1,1], dropout=0., lr=0.001, wd=0, num_epochs=700):
+    def __init__(self, num_features=4, num_hidden=25, num_classes=4, num_heads=[1,1,1], dropout=0., lr=0.001, wd=0, num_epochs=400):
         super().__init__()
 
         self.num_hidden = num_hidden
