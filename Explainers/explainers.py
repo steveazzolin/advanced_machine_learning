@@ -101,16 +101,13 @@ class SemiSupSubGraphX(Explainer):
 
 
 
-
-
-
 class SemiSupPGExplainer(Explainer):
     def __init__(self, framework, name_dataset, name_model, num_epochs=20, num_hops=3):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.dataset = framework.dataset
         self.model = framework.model
         self.framework = framework
-        self.explainer = PGExplainer(self.model, in_channels=self.model.dim_embedding*3, device=self.device, explain_graph=False, epochs=num_epochs, num_hops=num_hops)
+        self.explainer = PGExplainer(self.model, framework, in_channels=self.model.dim_embedding*3, device=self.device, explain_graph=False, epochs=num_epochs, num_hops=num_hops)
         
         self.name_explainer = "PGExplainer"
         self.name_dataset = name_dataset
@@ -148,9 +145,9 @@ class SemiSupPGExplainer(Explainer):
     #     return d
 
         
-    def explain_node(self, node_idx, top_k, precomputed_logits, precomputed_embd):
+    def explain_node(self, node_idx, top_k, precomputed_logits):
         with torch.no_grad():
-            walks, masks, related_preds, edge_list = self.explainer(self.dataset.data.x, self.dataset.data.edge_index, node_idx=node_idx, y=self.dataset.data.y, top_k=top_k, logits=precomputed_logits, embed=precomputed_embd)
+            walks, masks, related_preds, edge_list = self.explainer(self.dataset, node_idx=node_idx, y=self.dataset.data.y, top_k=top_k, logits=precomputed_logits)
         edge_mask = masks[0].cpu()
         
         x, edge_index, y, subset, kwargs, mapping = self.explainer.get_subgraph(node_idx=node_idx, x=self.dataset.data.x, edge_index=self.dataset.data.edge_index, y=self.dataset.data.y)
@@ -189,14 +186,13 @@ class SemiSupPGExplainer(Explainer):
         self.top_k = top_k
         
         print("Training PGExplainer...")
-        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True, precompute_embds=False) 
+        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True) 
         print("Training ended")
 
         preds , precomputed_logits = self.framework.predict(self.framework.train_loader, mask=torch.ones(self.dataset.data.num_nodes, dtype=torch.bool), return_logits=True)
-        precomputed_embds = self.framework.get_embd(self.framework.train_loader)
         explanations = []
-        for node_idx in tqdm(range(self.dataset.data.num_nodes)):
-            expl = self.explain_node(node_idx, top_k=top_k, precomputed_logits=precomputed_logits, precomputed_embd=precomputed_embds)
+        for node_idx in tqdm(range(200, self.dataset.data.num_nodes)):
+            expl = self.explain_node(node_idx, top_k=top_k, precomputed_logits=precomputed_logits)
             
             pred = preds[node_idx]
             explanations.append(expl)
@@ -271,7 +267,7 @@ class LargeSemiSupPGExplainer(Explainer):
         self.top_k = top_k
         
         print("Training PGExplainer...")
-        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True, precompute_embds=False) 
+        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True) 
         print("Training ended")
 
         preds , precomputed_logits = self.framework.predict(self.framework.train_loader, mask=torch.ones(self.dataset.data.num_nodes, dtype=torch.bool), return_logits=True)
