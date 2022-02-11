@@ -8,6 +8,7 @@ import Models.models_CORA as models_CORA
 import Models.models_MUTAG as models_MUTAG
 import Models.models_REDDIT as models_REDDIT
 import Models.models_BAshapes as models_BAshapes
+import Models.models_CITESEER as models_CITESEER
 
 import numpy as np
 
@@ -161,6 +162,8 @@ if __name__ == "__main__":
         fw = models_REDDIT.getFrameworkByName(args.model.upper())
     elif args.dataset.upper() == "BASHAPES":
         fw = models_BAshapes.getFrameworkByName(args.model.upper())
+    elif args.dataset.upper() == "CITESEER":
+        fw = models_CITESEER.getFrameworkByName(args.model.upper())
 
     path = f"Explanations/{args.expl}/{args.dataset}/{args.model}/"
     if args.time == "":

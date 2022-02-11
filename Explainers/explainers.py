@@ -191,7 +191,7 @@ class SemiSupPGExplainer(Explainer):
 
         preds , precomputed_logits = self.framework.predict(self.framework.train_loader, mask=torch.ones(self.dataset.data.num_nodes, dtype=torch.bool), return_logits=True)
         explanations = []
-        for node_idx in tqdm(range(200, self.dataset.data.num_nodes)):
+        for node_idx in tqdm(range(self.dataset.data.num_nodes)):
             expl = self.explain_node(node_idx, top_k=top_k, precomputed_logits=precomputed_logits)
             
             pred = preds[node_idx]
@@ -265,7 +265,7 @@ class LargeSemiSupPGExplainer(Explainer):
         self.top_k = top_k
         
         print("Training PGExplainer...")
-        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True, large_dataset=True, batch_size=1024) 
+        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True, large_dataset=True, batch_size=512) 
         print("Training ended")
 
         preds , precomputed_logits = self.framework.predict(self.framework.train_loader, mask=torch.ones(self.dataset.data.num_nodes, dtype=torch.bool), return_logits=True)
