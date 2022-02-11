@@ -122,7 +122,7 @@ class GCN_BAShapes(torch.nn.Module):
 
 
 class GAT_BAShapes(torch.nn.Module):
-    def __init__(self, num_features=4, num_hidden=25, num_classes=4, num_heads=[1,1,1], dropout=0., lr=0.001, wd=0, num_epochs=400):
+    def __init__(self, num_features=4, num_hidden=25, num_classes=4, num_heads=[1,1,1], dropout=0., lr=0.001, wd=0, num_epochs=300):
         super().__init__()
 
         self.num_hidden = num_hidden
