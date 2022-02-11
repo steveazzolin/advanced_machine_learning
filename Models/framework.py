@@ -174,16 +174,11 @@ class SemiSupFramework(Framework):
                 return preds
 
     @torch.no_grad()
-    def get_embd(self, loader):
-        assert len(self.train_loader) == 1
-
+    def get_emb(self, data):
         self.model.eval()
-        ret = []
-        for data in loader:
-            data = data.to(self.device)
-            out = self.model.get_emb(data)
-            ret.extend(out.cpu().tolist())
-        return ret
+        data = data.to(self.device)
+        out = self.model.get_emb(data)
+        return out.cpu()
 
 
 class LargeSemiSupFramework(Framework):
@@ -257,7 +252,7 @@ class LargeSemiSupFramework(Framework):
             return acc , preds
         else:
             if return_logits:
-                return preds , out[mask].cpu().tolist()
+                return out.detach().cpu()
             else:
                 return preds
 

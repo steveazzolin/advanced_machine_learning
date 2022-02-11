@@ -17,8 +17,10 @@ def explain_SubGraphX(model, dataset, dataset_name, model_name):
 
 
 def explain_PGExplainer(framework, dataset_name, model_name, save):
-    #fw = SemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=20, num_hops=3)
-    fw = LargeSemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=3, num_hops=3)
+    if dataset_name == "REDDIT":
+        fw = LargeSemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=3, num_hops=3)
+    else:
+        fw = SemiSupPGExplainer(framework, dataset_name, model_name, num_epochs=2, num_hops=3)
     fw.explain(top_k=5, save=save)
 
 
