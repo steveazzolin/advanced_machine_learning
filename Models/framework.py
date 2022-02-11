@@ -240,18 +240,21 @@ class LargeSemiSupFramework(Framework):
         return train_acc , val_acc , val_loss , test_acc
 
     @torch.no_grad()
-    def predict(self, loader, mask=None, return_metrics=False):
+    def predict(self, loader, mask=None, return_metrics=False, return_logits=False):
         assert loader.data.n_id is not None
 
         self.model.eval()
         out = self.model.inference(loader.data.x, loader, self.device)
         preds = out.argmax(-1).detach()
 
-        acc = float((preds[mask.to(self.device)] == loader.data.y[mask.to(self.device)].to(self.device)).sum() / mask.to(self.device).sum())
         if return_metrics:
+            acc = float((preds[mask.to(self.device)] == loader.data.y[mask.to(self.device)].to(self.device)).sum() / mask.to(self.device).sum())
             return acc , preds
         else:
-            return preds
+            if return_logits:
+                return out.detach().cpu()
+            else:
+                return preds
 
 
 

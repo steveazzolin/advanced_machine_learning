@@ -48,6 +48,7 @@ class FrameworkREDDIT(LargeSemiSupFramework):
         del subgraph_loader.data.x , subgraph_loader.data.y
         subgraph_loader.data.num_nodes = self.dataset.data.num_nodes
         subgraph_loader.data.n_id = torch.arange(self.dataset.data.num_nodes)
+        train_loader.data.n_id = torch.arange(self.dataset.data.num_nodes)
 
         super().__init__(model=model, 
                         train_loader=train_loader, 

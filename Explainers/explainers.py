@@ -228,7 +228,7 @@ class LargeSemiSupPGExplainer(Explainer):
         self.dataset = framework.dataset
         self.model = framework.model
         self.framework = framework
-        self.explainer = PGExplainer(self.model, in_channels=self.model.dim_embedding*3, device=self.device, explain_graph=False, epochs=num_epochs, num_hops=num_hops)
+        self.explainer = PGExplainer(self.model, framework, in_channels=self.model.dim_embedding*3, device=self.device, explain_graph=False, epochs=num_epochs, num_hops=num_hops)
         
         self.name_explainer = "PGExplainer"
         self.name_dataset = name_dataset
@@ -236,8 +236,7 @@ class LargeSemiSupPGExplainer(Explainer):
         self.num_epochs = num_epochs
         self.num_hops = num_hops
 
-        print("Testing the model...")
-        del framework.train_loader, framework.subgraph_loader
+        print("Testing the model...")        
         #kwargs = {'batch_size': 512, 'num_workers': 2, "pin_memory": True}
         #tmp = NeighborLoader(framework.dataset.data, input_nodes=None, num_neighbors=[-1], **kwargs)
         #tmp.data.n_id = torch.arange(tmp.data.num_nodes)
@@ -248,7 +247,7 @@ class LargeSemiSupPGExplainer(Explainer):
         
     def explain_node(self, node_idx, top_k, precomputed_logits, precomputed_embd):
         with torch.no_grad():
-            walks, masks, related_preds, edge_list = self.explainer(self.dataset.data.x, self.dataset.data.edge_index, node_idx=node_idx, y=self.dataset.data.y, top_k=top_k, logits=precomputed_logits, embed=precomputed_embd)
+            walks, masks, related_preds, edge_list = self.explainer(self.dataset.data.x, self.dataset.data.edge_index, node_idx=node_idx, y=self.dataset.data.y, top_k=top_k, logits=precomputed_logits, embed=precomputed_embd, large_dataset=True)
         edge_mask = masks[0].cpu()
         
         x, edge_index, y, subset, kwargs, mapping = self.explainer.get_subgraph(node_idx=node_idx, x=self.dataset.data.x, edge_index=self.dataset.data.edge_index, y=self.dataset.data.y)
@@ -263,11 +262,10 @@ class LargeSemiSupPGExplainer(Explainer):
 
     def explain(self, top_k, save=False):
         today = datetime.today().strftime('%Y-%m-%d-_%H-%M-%S')
-        self.dataset.data.to(self.device)
         self.top_k = top_k
         
         print("Training PGExplainer...")
-        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True) 
+        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True, large_dataset=True) 
         print("Training ended")
 
         preds , precomputed_logits = self.framework.predict(self.framework.train_loader, mask=torch.ones(self.dataset.data.num_nodes, dtype=torch.bool), return_logits=True)
