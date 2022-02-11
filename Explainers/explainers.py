@@ -265,7 +265,7 @@ class LargeSemiSupPGExplainer(Explainer):
         self.top_k = top_k
         
         print("Training PGExplainer...")
-        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True, large_dataset=True) 
+        self.pg_final_loss = self.explainer.train_explanation_network(self.dataset, precompute_netx=True, large_dataset=True, batch_size=1024) 
         print("Training ended")
 
         preds , precomputed_logits = self.framework.predict(self.framework.train_loader, mask=torch.ones(self.dataset.data.num_nodes, dtype=torch.bool), return_logits=True)
