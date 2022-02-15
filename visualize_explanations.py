@@ -18,6 +18,7 @@ import networkx as nx
 
 def read_explanations(path, divide_per_split=False):
     ret = defaultdict(lambda: defaultdict(list))
+    n = 0
     for split in os.listdir(path):
         if ".txt" in split: continue
         for c in os.listdir(os.path.join(path, split)):
@@ -28,7 +29,11 @@ def read_explanations(path, divide_per_split=False):
             for file in os.listdir(os.path.join(path, split, c)):
                 tmp = joblib_load(os.path.join(path, split, c, file))
                 data = tmp
+                if data.number_of_nodes() == 0:
+                    n += 1
+                    continue
                 ret[key][c].append((data, file.split(".")[0]))
+    print(f"Encounted {n} empty explanations")
     return ret
 
 
