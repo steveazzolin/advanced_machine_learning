@@ -56,6 +56,7 @@ if __name__ == "__main__":
         num_epochs = 40
         fw = models_BAshapes.getFrameworkByName(args.model.upper())
     elif args.dataset.upper() == "CITESEER":
+        num_epochs = 20
         fw = models_CITESEER.getFrameworkByName(args.model.upper())
     fw.load_model()
 
