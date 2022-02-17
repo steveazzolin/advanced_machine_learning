@@ -3,6 +3,7 @@ import torch
 import os
 from joblib import load as joblib_load
 from collections import defaultdict
+from tqdm import tqdm
 
 import Models.models_CORA as models_CORA
 import Models.models_MUTAG as models_MUTAG
@@ -19,25 +20,30 @@ from sklearn_extra.cluster import KMedoids
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-
-def read_explanations(path, divide_per_split=False):
+NUM_EXPLS = 0
+def read_explanations(path, divide_per_split=False, labels=None, splits=None):
+    global NUM_EXPLS
     ret = defaultdict(lambda: defaultdict(list))
     n = 0
     for split in os.listdir(path):
         if ".txt" in split: continue
         for c in os.listdir(os.path.join(path, split)):
             if divide_per_split:
+                if split not in splits:
+                    continue
                 key = split
             else:
                 key = "all"
             for file in os.listdir(os.path.join(path, split, c)):
                 tmp = joblib_load(os.path.join(path, split, c, file))
+                node_idx = int(file.split(".")[0])
                 data = tmp
-                if data.number_of_nodes() == 0:
+                if data.number_of_nodes() == 0 or (labels is not None and labels[node_idx] != int(c)):
                     n += 1
                     continue
                 ret[key][c].append((data, file.split(".")[0]))
-    print(f"Encountered {n} empty explanations")
+                NUM_EXPLS += 1
+    print(f"Encountered {n} empty/wrong explanations")
     return ret
 
 
@@ -89,6 +95,19 @@ def plot_single_graph(graph, ax):
         raise NotImplementedError("Graph non-weighted")
     
 
+def elbow_method(weights,):
+    sorted_weights = sorted(weights, reverse=True)
+
+    # define threshold to cut edges
+    stop = 0.4e-6 #np.mean(sorted_weights) # backup threshold
+    for i in range(len(sorted_weights)-2):
+        if i < 5: # include at least 5 edges
+            continue
+        if sorted_weights[i-1] - sorted_weights[i] >= 10 * (sorted_weights[i-2] - sorted_weights[i-1]) / 100 + (sorted_weights[i-2] - sorted_weights[i-1]):
+            stop = sorted_weights[i]
+            break
+    return stop
+
 def preprocess_explanations(expls, cut_edges, cut_cc):
     """
         Pre-process the local explanations such as to cut irrelavant edges and/or remove connected components not including the target node
@@ -99,21 +118,13 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
             for graph , node_idx in expls[split][c]:
                 edges , weights = zip(*nx.get_edge_attributes(graph,'weight').items())
                 weights = [w+1 for w in weights]
-                sorted_weights = sorted(weights, reverse=True)
-
-                # define threshold to cut edges
-                stop_i = np.mean(sorted_weights) # backup threshold
-                for i in range(len(sorted_weights)-2):
-                    if i <= 5: # include at least 5 edges
-                        continue
-                    if sorted_weights[i-1] - sorted_weights[i] >= 10 * (sorted_weights[i-2] - sorted_weights[i-1]) / 100 + (sorted_weights[i-2] - sorted_weights[i-1]):
-                        stop_i = sorted_weights[i]
-                        break
+                
+                stop = elbow_method(weights)
 
                 # build a tmp graph to be plotted
                 G_plot = nx.Graph(target_node=graph.graph["target_node"])
                 for j , i in enumerate(weights):
-                    if not cut_edges or i >= stop_i:  
+                    if not cut_edges or i >= stop:  
                         G_plot.add_edge(edges[j][0], edges[j][1], weight=i)
                         G_plot.add_edge(edges[j][1], edges[j][0], weight=i)
 
@@ -131,13 +142,31 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
 def plot_k_per_class(expls, labels, k):
     figsize = (10, 8)
     cols = k
-    rows = len(expls["all"].keys())
+    rows = len(expls["train"].keys())
 
     axs = plt.figure(figsize=figsize, constrained_layout=True).subplots(rows, cols)
     for i in range(rows):
-        for j , (elem , node_idx) in enumerate(expls["all"][str(i)][:cols]):
-            axs[i, j].set_title(f"pred: {i} lbl: {labels[int(node_idx)]}")
+        for j , (elem , node_idx) in enumerate(expls["train"][str(i)][:cols]):
+            axs[i, j].set_title(f"lbl: {labels[int(node_idx)]} diam: {diameter(elem)}")
             plot_single_graph(elem, axs[i,j])
+    plt.show()
+
+def plot_edge_weight_distribution(expls, k):
+    figsize = (10, 8)
+    cols = k
+    rows = len(expls["train"].keys())
+
+    axs = plt.figure(figsize=figsize, constrained_layout=True).subplots(rows, cols)
+    for i in range(rows):
+        for j , (graph , node_idx) in enumerate(expls["train"][str(i)][:cols]):
+            edges , weights = zip(*nx.get_edge_attributes(graph, 'weight').items())
+            weights = sorted(weights)            
+            cut_point = elbow_method(weights)
+            
+            #axs[i, j].set_title(f"backup cut")
+            axs[i, j].plot(list(range(len(weights))), weights)
+            axs[i, j].plot([0, len(weights)], [cut_point, cut_point])
+            axs[i, j].plot([len(weights) - 5, len(weights) - 5], [0, weights[-1]])
     plt.show()
 
 
@@ -148,7 +177,14 @@ def get_last_experiment(path):
 
 
 
-
+#  _______  _______ _________          _______  ______     __   
+# (       )(  ____ \\__   __/|\     /|(  ___  )(  __  \   /  \  
+# | () () || (    \/   ) (   | )   ( || (   ) || (  \  )  \/) ) 
+# | || || || (__       | |   | (___) || |   | || |   ) |    | | 
+# | |(_)| ||  __)      | |   |  ___  || |   | || |   | |    | | 
+# | |   | || (         | |   | (   ) || |   | || |   ) |    | | 
+# | )   ( || (____/\   | |   | )   ( || (___) || (__/  )  __) (_
+# |/     \|(_______/   )_(   |/     \|(_______)(______/   \____/ 
 
 def avg_knn(g, edge_attribute="weight"):
     res = np.mean(list(dict(nx.average_degree_connectivity(g,weight=edge_attribute)).values()))
@@ -173,28 +209,30 @@ def avg_eig_cent(g, edge_attribute="weight"):
 def avg_closeness(g, edge_attribute="weight"):
     res = np.mean(list(dict(nx.closeness_centrality(g,distance=edge_attribute)).values()))
     return res
+def diameter(g):
+    return nx.algorithms.distance_measures.diameter(g)
 def get_embedding(g, metrics):    
     res = []
     for m in metrics:
         res.append(m(g))        
     return res
 
-
-
 def extract_features_per_graph(expls, log=False):
     """
         Extract features for every graph
     """
-    metrics = [avg_closeness, coherence, intensity, avg_beet, avg_clust, avg_knn, avg_eig_cent]
-    ret = defaultdict(lambda: defaultdict(list))
-    for split in expls.keys():
-        for c in expls[split].keys():
-            for graph , node_idx in expls[split][c]:
-                ret[split][c].append(get_embedding(graph, metrics))
+    with tqdm(total=NUM_EXPLS) as pbar:
+        metrics = [avg_closeness, coherence, intensity, avg_beet, avg_clust, avg_knn, diameter, avg_eig_cent]
+        ret = defaultdict(lambda: defaultdict(list))
+        for split in expls.keys():
+            for c in expls[split].keys():
+                for graph , node_idx in expls[split][c]:
+                    ret[split][c].append(get_embedding(graph, metrics))
+                    pbar.update(1)
     return ret
 
 
-def visualize_embeddings(embs):
+def visualize_embeddings(embs, k):
     all_embds , classes = [] , []
     for split in embs.keys():
         for c in embs[split].keys():
@@ -202,7 +240,6 @@ def visualize_embeddings(embs):
             all_embds.extend(class_embs)
             classes.extend([c]*len(class_embs))
 
-    print(all_embds[:3])
     pca = PCA(n_components=2, random_state=42)
     emb_2d = pca.fit_transform(StandardScaler().fit_transform(all_embds))
     print("PCA explained variance: ", pca.explained_variance_ratio_)
@@ -210,15 +247,105 @@ def visualize_embeddings(embs):
     emb_2d = np.array(emb_2d)
     classes = np.array(classes)
     for c in np.unique(classes):
-        plt.scatter(emb_2d[classes == c,0], emb_2d[classes == c,1], c=np.random.rand(len(classes[classes == c])), label=c)
+        plt.scatter(emb_2d[classes == c,0], emb_2d[classes == c,1], label=c)
     plt.legend()
 
-    kmedoids = KMedoids(n_clusters=2, random_state=42).fit(emb_2d)
+    #kmedoids = KMedoids(n_clusters=k, random_state=42).fit(emb_2d)    
+    #plt.scatter(kmedoids.cluster_centers_[:,0], kmedoids.cluster_centers_[:,1], marker='x', c="red")
     
-    plt.scatter(kmedoids.cluster_centers_[:,0], kmedoids.cluster_centers_[:,1], marker='x', c="red")
-    plt.show()    
+    plt.show()
     #kmedoids = KMedoids(n_clusters=n_clusters, random_state=0).fit(emb)
+
+
+
+
+
+#  _______  _______ _________          _______  ______     _______ 
+# (       )(  ____ \\__   __/|\     /|(  ___  )(  __  \   / ___   )
+# | () () || (    \/   ) (   | )   ( || (   ) || (  \  )  \/   )  |
+# | || || || (__       | |   | (___) || |   | || |   ) |      /   )
+# | |(_)| ||  __)      | |   |  ___  || |   | || |   | |    _/   / 
+# | |   | || (         | |   | (   ) || |   | || |   ) |   /   _/  
+# | )   ( || (____/\   | |   | )   ( || (___) || (__/  )  (   (__/\
+# |/     \|(_______/   )_(   |/     \|(_______)(______/   \_______/
+
+def method2(expls):
+    """
+        Per class:
+            - compute pairwise edit distances
+            - show a matrix with the values to check for clusters
+            - recursive algorithm for prototype selection:
+                - take graph most similar to others
+                - discretize all the other distances 
+                - do not consider all other graph which have a strong similarity with the ones added to the set
+                - iterate until graphs are over or min number of graphs are added
+    """
+    for split in expls.keys():
+        for c in expls[split].keys():
+            class_expls = expls[split][c]
+
+            m = np.full((len(class_expls), len(class_expls)), np.nan)
+            for i in range(len(class_expls)):
+                for j in range(i, len(class_expls)):
+                    m[i, j] = nx.graph_edit_distance(class_expls[i][0], class_expls[j][0])
+                    m[j, i] = m[i, j]
+            plt.matshow(m)
+            plt.colorbar()
+            plt.title(f"Class {c}")
+            plt.show()
+
+            res = []
+            recursive_prototype_finding(m, res, max_num_elements=5, remove=set())
+
+            cols = len(res)
+            rows = 1
+            axs = plt.figure(figsize=(7, 5), constrained_layout=True).subplots(rows, cols)
+            print(axs.shape)
+            for j , idx in enumerate(res):                
+                #axs[i, j].set_title(f"backup cut")
+                plot_single_graph(class_expls[idx][0], axs[j])
+            plt.show()
     
+def get_candidate_prototype(m, ret, remove):
+    """
+        Return the idx of the graph to be selected, i.e., the one most similar to the majority of other graphs
+    """
+    avg_distances = []
+    for i in range(len(m[0])):
+        if i in ret or i in remove:
+            avg_distances.append(np.inf)
+            continue
+
+        i_avg_distance , n = 0 , 0
+        for j in range(len(m[0])):
+            if j not in ret and j not in remove:
+                i_avg_distance += m[i, j]
+                n += 1
+        avg_distances.append(i_avg_distance / n)
+    print(avg_distances)
+    return np.argmin(avg_distances)
+
+def remove_similar_to_prototype(m, ret, remove, threshold=2):
+    """
+        Add to 'remove' every graph which is too similar to the last added graph
+    """
+    for i in range(len(m[0])):
+        if m[ret[-1], i] <= threshold:
+            remove.add(i)
+    return remove
+
+
+def recursive_prototype_finding(m, ret, max_num_elements, remove):
+    if len(ret) > max_num_elements or len(remove) == len(m[0]):
+        return
+    else:
+        idx = get_candidate_prototype(m, ret, remove)
+        print(idx)
+        ret.append(idx)
+        remove = remove_similar_to_prototype(m, ret, remove)
+        print(remove)
+        return recursive_prototype_finding(m, ret, max_num_elements, remove)
+
 
 
 if __name__ == "__main__":
@@ -227,7 +354,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', default="", help='Dataset to explain.')
     parser.add_argument('--expl', default="", help='Explainer to use.')
     parser.add_argument('--time', default="", help='Time of reference experiment.')
-    parser.add_argument('--k', default=5, help='Number of plots per class.', type=int)
+    parser.add_argument('--k', default=5, help='Number of .', type=int)
     parser.add_argument('--cut_edges', action='store_true', default=False, help='Whether to apply a threshold on edges with low score.')
     parser.add_argument('--cut_cc', action='store_true', default=False, help='Whether to cut the connected components not including the target node.')
     args = parser.parse_args()
@@ -257,13 +384,22 @@ if __name__ == "__main__":
         print("Reading: ", args.time)
     path += str(args.time)
 
-    expls = read_explanations(path, divide_per_split=False)
+    expls = read_explanations(path, divide_per_split=True, labels=fw.dataset.data.y, splits=["train"])
+    print(expls.keys())
+
+    #plot_edge_weight_distribution(expls, k=9) 
+
     expls = preprocess_explanations(expls, cut_edges=args.cut_edges, cut_cc=args.cut_cc)
+    expls_unique = find_unique_explanations(expls, log=True)
+
+    #plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
+    
 
     # METHOD 1: Extract features
-    embs = extract_features_per_graph(expls, log=True)
-    visualize_embeddings(embs)
+    #embs = extract_features_per_graph(expls_unique, log=True)
+    #visualize_embeddings(embs, k=args.k)
 
 
-
-    #plot_k_per_class(expls, labels=fw.dataset.data.y, k=args.k)
+    # METHOD 2: Graph edit distance
+    method2(expls_unique)
+    
