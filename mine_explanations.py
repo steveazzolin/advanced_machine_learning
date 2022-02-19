@@ -1,4 +1,5 @@
 import argparse
+from async_timeout import timeout
 import torch
 import os
 from joblib import load as joblib_load
@@ -79,6 +80,7 @@ def find_unique_explanations(expls, log=False):
 def plot_single_graph(graph, ax):
     if nx.is_weighted(graph):
         edges , weights = zip(*nx.get_edge_attributes(graph, 'weight').items())
+        weights = [(w)**2 for w in weights]
 
         # assign red color to the target node
         color_map = []
@@ -88,7 +90,7 @@ def plot_single_graph(graph, ax):
             else:
                 color_map.append("blue")
         pos = nx.spring_layout(graph, seed=42)
-        nx.draw(graph, pos, node_size=40, node_color=color_map, ax=ax, edge_color="blue", width=weights)
+        s = nx.draw(graph, pos, node_size=40, node_color=color_map, ax=ax, edge_color="blue", width=weights)
     elif len(graph.nodes()) > 0:
         nx.draw(graph)
         print(graph)
@@ -269,82 +271,137 @@ def visualize_embeddings(embs, k):
 # | )   ( || (____/\   | |   | )   ( || (___) || (__/  )  (   (__/\
 # |/     \|(_______/   )_(   |/     \|(_______)(______/   \_______/
 
-def method2(expls):
+def method2(expls, max_num_elements_per_class, upper_bound=20):
     """
         Per class:
             - compute pairwise edit distances
-            - show a matrix with the values to check for clusters
             - recursive algorithm for prototype selection:
                 - take graph most similar to others
-                - discretize all the other distances 
                 - do not consider all other graph which have a strong similarity with the ones added to the set
-                - iterate until graphs are over or min number of graphs are added
+                - iterate until graphs are over or max number of graphs are added
     """
     for split in expls.keys():
         for c in expls[split].keys():
             class_expls = expls[split][c]
 
-            m = np.full((len(class_expls), len(class_expls)), np.nan)
+            m = np.full((len(class_expls), len(class_expls)), -10)
             for i in range(len(class_expls)):
-                for j in range(i, len(class_expls)):
-                    m[i, j] = nx.graph_edit_distance(class_expls[i][0], class_expls[j][0])
+                m[i, i] = 0
+                for j in range(i+1, len(class_expls)):
+                    tmp = nx.graph_edit_distance(class_expls[i][0], class_expls[j][0], upper_bound=upper_bound, timeout=60)
+                    m[i, j] = tmp if tmp is not None else upper_bound
                     m[j, i] = m[i, j]
-            plt.matshow(m)
-            plt.colorbar()
-            plt.title(f"Class {c}")
+
+            # apply filtering algorithm
+            prototypes , inertias , inertias2 = [] , [] , []
+            print(f"-------------------------------------\nClass {c}")
+            recursive_prototype_finding(m, prototypes, inertias, inertias2, max_num_elements=max_num_elements_per_class, remove=set())
+            prototypes = prototypes[:max_num_elements_per_class] # can be replaced by elbow method
+
+            ##
+            # Plot metrics and results
+            ##
+            axs = plt.figure().subplots(1, 3)
+            tmp = axs[0].matshow(m)
+            #plt.colorbar(tmp, ax=axs[0])
+            for i in range(len(m[0])):
+                for j in range(len(m[0])):
+                    axs[0].text(i, j, str(m[i,j]), va='center', ha='center')
+            axs[0].set_title(f"Edit distances for Class {c}")
+
+            # plot inertia curve            
+            axs[1].plot(list(range(1, len(inertias)+1)), inertias)
+            axs[1].set_title("Inertia")
+            axs[1].set_xlabel("N° prototypes")
+            axs[1].set_xticks(list(range(1, len(inertias)+1)))
+
+            # plot inertia curve            
+            axs[2].plot(list(range(1, len(inertias2)+1)), inertias2)
+            axs[2].set_title("N° unmatched graphs")
+            axs[2].set_xlabel("N° prototypes")
+            axs[2].set_xticks(list(range(1, len(inertias2)+1)))
+            axs[2].set_yticks(list(range(max(inertias2)+1)))
+
+            # plot original vs filtered graphs
+            fig = plt.figure(figsize=(7, 5), constrained_layout=True)
+            fig.suptitle('Original vs Filtered Graphs')
+            axs = fig.subplots(2, min(9, len(class_expls)))
+            for j in range(min(9, len(class_expls))):
+                plot_single_graph(class_expls[j][0], axs[0, j])
+            for j , idx in enumerate(prototypes):         
+                plot_single_graph(class_expls[idx][0], axs[1, j])            
             plt.show()
 
-            res = []
-            recursive_prototype_finding(m, res, max_num_elements=5, remove=set())
 
-            cols = len(res)
-            rows = 1
-            axs = plt.figure(figsize=(7, 5), constrained_layout=True).subplots(rows, cols)
-            print(axs.shape)
-            for j , idx in enumerate(res):                
-                #axs[i, j].set_title(f"backup cut")
-                plot_single_graph(class_expls[idx][0], axs[j])
-            plt.show()
+
+def inertia(proto, distances):
+    """
+        Compute the sum of the minimum Edit distances between prototypes and original graphs
+        Only minimum prototype-original graphs edit distances are considered in the computation
+    """
+    ret = 0
+    for i in range(len(distances[0])):
+        min_index = np.argmin(distances[i, proto])
+        #if sum(distances[proto[min_index]]) / (len(distances) - 1) <= 18: #if False, the 'i' graph is very similar to all other graphs, so consider as outlier
+        ret += distances[i, proto[min_index]]
+    return ret
+
+def inertia2(proto, distances, M=7):
+    """
+        Compute the number of unmatched graphs in the original set w.r.t. the filtered set
+        A graph is said unmatched if there are no graphs in the filtered set to which their Edit distance is <= M
+    """
+    ret = 0
+    for i in range(len(distances[0])):
+        min_distance = np.min(distances[i, proto])
+        if min_distance > M:
+            ret += 1
+    return ret
     
-def get_candidate_prototype(m, ret, remove):
+def get_candidate_prototype(m, remove):
     """
         Return the idx of the graph to be selected, i.e., the one most similar to the majority of other graphs
     """
     avg_distances = []
     for i in range(len(m[0])):
-        if i in ret or i in remove:
+        if i in remove:
             avg_distances.append(np.inf)
             continue
 
         i_avg_distance , n = 0 , 0
         for j in range(len(m[0])):
-            if j not in ret and j not in remove:
+            if j not in remove:
                 i_avg_distance += m[i, j]
                 n += 1
         avg_distances.append(i_avg_distance / n)
-    print(avg_distances)
+    print("Avg distances: ", avg_distances)
     return np.argmin(avg_distances)
 
-def remove_similar_to_prototype(m, ret, remove, threshold=2):
+def remove_similar_to_prototype(m, prototypes, remove, threshold=4):
     """
         Add to 'remove' every graph which is too similar to the last added graph
     """
+    remove.add(prototypes[-1])
     for i in range(len(m[0])):
-        if m[ret[-1], i] <= threshold:
+        if m[prototypes[-1], i] <= threshold:
             remove.add(i)
-    return remove
 
-
-def recursive_prototype_finding(m, ret, max_num_elements, remove):
-    if len(ret) > max_num_elements or len(remove) == len(m[0]):
-        return
+def recursive_prototype_finding(m, prototypes, inertias, inertias2, max_num_elements, remove):
+    """
+        Greedy algorithm selecting at every iteration the element with minimum avg distance.
+        Maybe a branch and bound works better?
+    """
+    if len(remove) == len(m[0]): #len(prototypes) >= max_num_elements or 
+        return None
     else:
-        idx = get_candidate_prototype(m, ret, remove)
-        print(idx)
-        ret.append(idx)
-        remove = remove_similar_to_prototype(m, ret, remove)
-        print(remove)
-        return recursive_prototype_finding(m, ret, max_num_elements, remove)
+        idx = get_candidate_prototype(m, remove)
+        print("Idx selected: ", idx)
+        prototypes.append(idx)
+        remove_similar_to_prototype(m, prototypes, remove)
+        print("Remove set and inertia: ", remove, inertia(prototypes, m))
+        inertias.append(inertia(prototypes, m))
+        inertias2.append(inertia2(prototypes, m))
+        return recursive_prototype_finding(m, prototypes, inertias, inertias2, max_num_elements, remove)
 
 
 
@@ -401,5 +458,5 @@ if __name__ == "__main__":
 
 
     # METHOD 2: Graph edit distance
-    method2(expls_unique)
+    method2(expls_unique, max_num_elements_per_class=3)
     
