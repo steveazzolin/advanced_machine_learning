@@ -5,7 +5,13 @@ import os
 from joblib import load as joblib_load
 from collections import defaultdict
 from tqdm import tqdm
+import time
 
+from torch_geometric.data import InMemoryDataset
+from torch_geometric.utils import from_networkx, to_networkx
+from torch_geometric.nn import global_add_pool, global_mean_pool
+
+from Models.framework import GraphClassificationFramework
 import Models.models_CORA as models_CORA
 import Models.models_MUTAG as models_MUTAG
 import Models.models_REDDIT as models_REDDIT
@@ -20,6 +26,7 @@ import networkx as nx
 from sklearn_extra.cluster import KMedoids
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix
 
 NUM_EXPLS = 0
 def read_explanations(path, divide_per_split=False, labels=None, splits=None):
@@ -80,7 +87,7 @@ def find_unique_explanations(expls, log=False):
 def plot_single_graph(graph, ax):
     if nx.is_weighted(graph):
         edges , weights = zip(*nx.get_edge_attributes(graph, 'weight').items())
-        weights = [(w)**2 for w in weights]
+        #weights = [(w)**2 for w in weights]
 
         # assign red color to the target node
         color_map = []
@@ -90,7 +97,7 @@ def plot_single_graph(graph, ax):
             else:
                 color_map.append("blue")
         pos = nx.spring_layout(graph, seed=42)
-        s = nx.draw(graph, pos, node_size=40, node_color=color_map, ax=ax, edge_color="blue", width=weights)
+        s = nx.draw(graph, pos, node_size=40, node_color=color_map, ax=ax, edge_color="blue")
     elif len(graph.nodes()) > 0:
         nx.draw(graph)
         print(graph)
@@ -114,6 +121,13 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
     """
         Pre-process the local explanations such as to cut irrelavant edges and/or remove connected components not including the target node
     """
+    print("Before preprocessing:")
+    for split in expls.keys():
+        print(split)
+        for c in expls[split].keys():
+            print(f"\t {c}: {len(expls[split][c])}")
+
+    start = time.time()
     ret = defaultdict(lambda: defaultdict(list))
     for split in expls.keys():
         for c in expls[split].keys():
@@ -139,7 +153,8 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
                                 G_plot.remove_node(node)
                 if len(G_plot.nodes()) > 0:
                     ret[split][c].append((G_plot, node_idx))
-        return ret
+    print("Time: ", time.time() - start)    
+    return ret
 
 def plot_k_per_class(expls, labels, k):
     figsize = (10, 8)
@@ -148,8 +163,12 @@ def plot_k_per_class(expls, labels, k):
 
     axs = plt.figure(figsize=figsize, constrained_layout=True).subplots(rows, cols)
     for i in range(rows):
+        for j in range(cols):
+            axs[i, j].axis("off")
+    for i in range(rows):
         for j , (elem , node_idx) in enumerate(expls["train"][str(i)][:cols]):
-            axs[i, j].set_title(f"lbl: {labels[int(node_idx)]} diam: {diameter(elem)}")
+            d = diameter(elem) if nx.is_connected(elem) else 'nan'
+            axs[i, j].set_title(f"lbl: {labels[int(node_idx)]} diam: {d}")
             plot_single_graph(elem, axs[i,j])
     plt.show()
 
@@ -162,15 +181,34 @@ def plot_edge_weight_distribution(expls, k):
     for i in range(rows):
         for j , (graph , node_idx) in enumerate(expls["train"][str(i)][:cols]):
             edges , weights = zip(*nx.get_edge_attributes(graph, 'weight').items())
-            weights = sorted(weights)            
+            weights = sorted(weights, reverse=True)            
             cut_point = elbow_method(weights)
             
             #axs[i, j].set_title(f"backup cut")
             axs[i, j].plot(list(range(len(weights))), weights)
             axs[i, j].plot([0, len(weights)], [cut_point, cut_point])
+            axs[i, j].set_xlabel("edge index")
+            axs[i, j].set_ylabel("edge score")
+            axs[i, j].set_title(f"Node idx {node_idx}")
             axs[i, j].plot([len(weights) - 5, len(weights) - 5], [0, weights[-1]])
     plt.show()
 
+def plot_edge_weight_distribution_hist(expls):
+    n_classes = len(expls["train"].keys())
+    ws = []
+    for i in range(n_classes):
+        for j , (graph , _) in enumerate(expls["train"][str(i)][:]):
+            _ , weights = zip(*nx.get_edge_attributes(graph, 'weight').items())
+            ws.extend([w for w in weights])
+    plt.figure(figsize=(7,6))
+    plt.hist(ws, log=True)
+    plt.xlabel("PGExplainer score", fontsize=20)
+    plt.ylabel("Log #", fontsize=20)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    #plt.title("BAShapes", fontsize=25)
+    #plt.savefig(b"C:\Users\Steve\Desktop\BAShapes_edges.png")
+    plt.show()
 
 def get_last_experiment(path):
     return sorted([f for f in os.listdir(path)])[-1]
@@ -223,18 +261,18 @@ def extract_features_per_graph(expls, log=False):
     """
         Extract features for every graph
     """
-    with tqdm(total=NUM_EXPLS) as pbar:
-        metrics = [avg_closeness, coherence, intensity, avg_beet, avg_clust, avg_knn, diameter, avg_eig_cent]
-        ret = defaultdict(lambda: defaultdict(list))
-        for split in expls.keys():
-            for c in expls[split].keys():
-                for graph , node_idx in expls[split][c]:
-                    ret[split][c].append(get_embedding(graph, metrics))
-                    pbar.update(1)
+    #with tqdm(total=NUM_EXPLS) as pbar:
+    metrics = [avg_closeness, coherence, intensity, avg_beet, avg_clust, avg_knn, diameter, avg_eig_cent]
+    ret = defaultdict(lambda: defaultdict(list))
+    for split in expls.keys():
+        for c in expls[split].keys():
+            for graph , node_idx in expls[split][c]:
+                ret[split][c].append(get_embedding(graph, metrics))
+                #pbar.update(1)
     return ret
 
 
-def visualize_embeddings(embs, k):
+def visualize_embeddings(embs, k, name):
     all_embds , classes = [] , []
     for split in embs.keys():
         for c in embs[split].keys():
@@ -249,8 +287,11 @@ def visualize_embeddings(embs, k):
     emb_2d = np.array(emb_2d)
     classes = np.array(classes)
     for c in np.unique(classes):
-        plt.scatter(emb_2d[classes == c,0], emb_2d[classes == c,1], label=c)
+        plt.scatter(emb_2d[classes == c,0], emb_2d[classes == c,1], label=f"Class {c}")
     plt.legend()
+    plt.ylabel("principal component 1")
+    plt.xlabel("principal component 2")
+    plt.title(name)
 
     #kmedoids = KMedoids(n_clusters=k, random_state=42).fit(emb_2d)    
     #plt.scatter(kmedoids.cluster_centers_[:,0], kmedoids.cluster_centers_[:,1], marker='x', c="red")
@@ -404,6 +445,132 @@ def recursive_prototype_finding(m, prototypes, inertias, inertias2, max_num_elem
         return recursive_prototype_finding(m, prototypes, inertias, inertias2, max_num_elements, remove)
 
 
+#  _______  _______ _________          _______  ______     ______  
+# (       )(  ____ \\__   __/|\     /|(  ___  )(  __  \   / ___  \ 
+# | () () || (    \/   ) (   | )   ( || (   ) || (  \  )  \/   \  \
+# | || || || (__       | |   | (___) || |   | || |   ) |     ___) /
+# | |(_)| ||  __)      | |   |  ___  || |   | || |   | |    (___ ( 
+# | |   | || (         | |   | (   ) || |   | || |   ) |        ) \
+# | )   ( || (____/\   | |   | )   ( || (___) || (__/  )  /\___/  /
+# |/     \|(_______/   )_(   |/     \|(_______)(______/   \______/ 
+
+
+class GECT_NET(torch.nn.Module):
+    """
+        Model definition for the 'Graph Explanation Classification Task'
+    """
+    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=700):
+        from torch_geometric.nn import GINConv
+        super().__init__()
+
+        self.num_hidden = num_hidden
+        self.num_epochs = num_epochs
+        self.dropout = dropout
+
+        nn1 = torch.nn.Sequential(
+            torch.nn.Linear(num_features, num_hidden[0]),
+            torch.nn.BatchNorm1d(num_hidden[0]),
+            torch.nn.LeakyReLU(),
+            torch.nn.Dropout(dropout)
+        )
+
+        nn2 = torch.nn.Sequential(
+            torch.nn.Linear(num_hidden[0], num_hidden[1]),
+            torch.nn.BatchNorm1d(num_hidden[1]),
+            torch.nn.LeakyReLU(),
+            torch.nn.Dropout(dropout)
+        )        
+
+        self.conv1 = GINConv(nn1, train_eps=True)
+        self.conv2 = GINConv(nn2, train_eps=True)
+        self.lin = torch.nn.Linear(num_hidden[1] + num_hidden[0], num_classes)
+
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd)
+
+    def forward(self, data):
+        x, edge_index, edge_attr = data.x , data.edge_index , data.edge_attr
+        x = self.embedding(x, edge_index, edge_attr, data.batch)
+        x = self.lin(x)
+        return torch.nn.functional.log_softmax(x, dim=-1)
+
+    def embedding(self, x, edge_index, edge_attr, batch):
+        x1 = self.conv1(x, edge_index)
+        x2 = self.conv2(x1, edge_index)
+        return torch.cat((global_add_pool(x1, batch), global_add_pool(x2, batch)), dim=1)
+
+
+class ExplanationsDataset(InMemoryDataset):
+    def __init__(self, expls, splits):
+        import shutil
+        shutil.rmtree('tmp/')
+        self.expls = expls
+        self.splits = splits
+        super().__init__("tmp/", None, None, None)
+        
+        self.data , self.slices = self.process()
+
+    @property
+    def processed_file_names(self):
+        return ['explanation_graph.pt']
+
+    def process(self):
+        data_list = []
+
+        #construct data list
+        for split in self.splits:
+            for c in self.expls[split].keys():
+                for graph , node_idx in self.expls[split][c]:                    
+                    data = from_networkx(graph)
+                    data.edge_attr = data.weight.reshape(-1, 1)
+                    data.y = torch.tensor(int(c))
+                    data.x = torch.ones((data.num_nodes, 5), dtype=torch.float32)
+                    #data.x[graph.graph["target_node"]] = 1
+                    del data.weight
+                    data_list.append(data)
+        return self.collate(data_list)
+
+class ExplanationsClassificationFramework(GraphClassificationFramework):
+    def __init__(self, expls, batch_size):
+        from torch_geometric.loader import DataLoader
+
+        self.train_dataset = ExplanationsDataset(expls, ["train", "val"]) #join train and val, to favor overfitting
+        self.val_dataset = ExplanationsDataset(expls, ["val"])
+        self.test_dataset = ExplanationsDataset(expls, ["test"])
+
+        train_loader = DataLoader(self.train_dataset, batch_size=batch_size)
+        val_loader = DataLoader(self.val_dataset, batch_size=64)
+        test_loader = DataLoader(self.test_dataset, batch_size=64)
+
+        model = GECT_NET(num_classes=len(torch.unique(self.train_dataset.data.y)))
+        super().__init__(model=model, 
+                        train_loader=train_loader, 
+                        test_loader=test_loader, 
+                        val_loader=val_loader,
+                        optimizer=model.optimizer, 
+                        num_epochs=model.num_epochs, 
+                        semi_sup=False)
+
+def learn_features_per_graph(expls, log=False):
+    """
+        Learn features for every graph via a graph classification task
+    """
+    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=4)
+    gc_fw.train(log=True)
+
+    acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
+    print("Train graph classification acc/loss: ", round(acc,3), loss)
+    print(confusion_matrix(gc_fw.train_dataset.data.y, preds))    
+    acc , preds , loss = gc_fw.predict(gc_fw.test_loader, return_loss=True)
+    print("Test graph classification acc/loss: ", round(acc,3), loss)
+
+    ret = defaultdict(lambda: defaultdict(list))
+    for split in expls.keys():
+        for c in expls[split].keys():
+            for graph , node_idx in expls[split][c]:
+                #ret[split][c].append(get_embedding(graph, metrics))
+                pass
+    return ret
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -441,22 +608,31 @@ if __name__ == "__main__":
         print("Reading: ", args.time)
     path += str(args.time)
 
-    expls = read_explanations(path, divide_per_split=True, labels=fw.dataset.data.y, splits=["train"])
+    expls = read_explanations(path, divide_per_split=True, labels=fw.dataset.data.y, splits=["train", "val", "test"])
     print(expls.keys())
 
-    #plot_edge_weight_distribution(expls, k=9) 
+    #plot_edge_weight_distribution(expls, k=5) 
+    #plot_edge_weight_distribution_hist(expls)
 
     expls = preprocess_explanations(expls, cut_edges=args.cut_edges, cut_cc=args.cut_cc)
     expls_unique = find_unique_explanations(expls, log=True)
 
-    #plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
+    plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
     
-
+    ##
     # METHOD 1: Extract features
+    ##
     #embs = extract_features_per_graph(expls_unique, log=True)
-    #visualize_embeddings(embs, k=args.k)
+    #visualize_embeddings(embs, k=args.k, name=args.dataset)
 
-
+    ##
     # METHOD 2: Graph edit distance
-    method2(expls_unique, max_num_elements_per_class=3)
+    ##
+    #method2(expls_unique, max_num_elements_per_class=3)
+
     
+    ##
+    # METHOD 2: Learn featues via graph classification
+    ##
+    embs = learn_features_per_graph(expls_unique, log=True)
+    visualize_embeddings(embs, k=args.k)
