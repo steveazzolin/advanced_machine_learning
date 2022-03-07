@@ -266,7 +266,7 @@ class GraphClassificationFramework(Framework):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def train(self, log=False, log_wandb=False):
+    def train(self, log=False, log_wandb=False, prefix=""):
         if log_wandb:
             run = self.init_logger()
 
@@ -280,7 +280,7 @@ class GraphClassificationFramework(Framework):
             if self.val_loader is not None:
                 val_acc , _ , val_loss = self.predict(self.val_loader, return_loss=True)
                 if val_loss <= best_val_loss:
-                    self.save_model(prefix="best_so_far_")
+                    self.save_model(prefix="best_so_far_" + prefix)
                     best_val_loss = val_loss
 
             if epoch % 10 == 0 and log:
@@ -293,7 +293,7 @@ class GraphClassificationFramework(Framework):
         if log_wandb:
             self.stop_logger(run)
         if self.val_loader is not None:
-            self.load_model(prefix="best_so_far_")
+            self.load_model(prefix="best_so_far_" + prefix)
     
     def train_epoch(self, log):   
         self.model.train()    
