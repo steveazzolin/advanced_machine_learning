@@ -604,7 +604,7 @@ if __name__ == "__main__":
     elif args.dataset.upper() == "CITESEER":
         fw = models_CITESEER.getFrameworkByName(args.model.upper())
 
-    path = f"./Explanations/{args.expl}/{args.dataset}/{args.model}/"
+    path = f"./Explanations/{args.expl}/{args.dataset.upper()}/{args.model}/"
     if args.time == "":
         args.time = get_last_experiment(path)
         print("Reading: ", args.time)
