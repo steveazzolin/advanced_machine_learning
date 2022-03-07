@@ -459,8 +459,8 @@ class GECT_NET(torch.nn.Module):
     """
         Model definition for the 'Graph Explanation Classification Task'
     """
-    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=700):
-        from torch_geometric.nn import GINConv
+    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=500):
+        from torch_geometric.nn import GINEConv
         super().__init__()
 
         self.num_hidden = num_hidden
@@ -481,8 +481,8 @@ class GECT_NET(torch.nn.Module):
             torch.nn.Dropout(dropout)
         )        
 
-        self.conv1 = GINConv(nn1, train_eps=True)
-        self.conv2 = GINConv(nn2, train_eps=True)
+        self.conv1 = GINEConv(nn1, train_eps=True, edge_dim=1)
+        self.conv2 = GINEConv(nn2, train_eps=True, edge_dim=1)
         self.lin = torch.nn.Linear(num_hidden[1] + num_hidden[0], num_classes)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd)
@@ -494,8 +494,8 @@ class GECT_NET(torch.nn.Module):
         return torch.nn.functional.log_softmax(x, dim=-1)
 
     def embedding(self, x, edge_index, edge_attr, batch):
-        x1 = self.conv1(x, edge_index)
-        x2 = self.conv2(x1, edge_index)
+        x1 = self.conv1(x, edge_index, edge_attr)
+        x2 = self.conv2(x1, edge_index, edge_attr)
         return torch.cat((global_add_pool(x1, batch), global_add_pool(x2, batch)), dim=1)
 
 
@@ -514,6 +514,7 @@ class ExplanationsDataset(InMemoryDataset):
         return ['explanation_graph.pt']
 
     def process(self):
+        from sklearn.preprocessing import StandardScaler
         data_list = []
 
         #construct data list
@@ -521,7 +522,7 @@ class ExplanationsDataset(InMemoryDataset):
             for c in self.expls[split].keys():
                 for graph , node_idx in self.expls[split][c]:                    
                     data = from_networkx(graph)
-                    data.edge_attr = data.weight.reshape(-1, 1)
+                    data.edge_attr = torch.tensor(StandardScaler().fit_transform(data.weight.reshape(-1, 1)), dtype=torch.float).reshape(-1, 1)
                     data.y = torch.tensor(int(c))
                     data.x = torch.ones((data.num_nodes, 5), dtype=torch.float32)
                     #data.x[graph.graph["target_node"]] = 1
@@ -533,11 +534,11 @@ class ExplanationsClassificationFramework(GraphClassificationFramework):
     def __init__(self, expls, batch_size):
         from torch_geometric.loader import DataLoader
 
-        self.train_dataset = ExplanationsDataset(expls, ["train", "val"]) #join train and val, to favor overfitting
+        self.train_dataset = ExplanationsDataset(expls, ["train", "val"]) #join train and val to favor overfitting
         self.val_dataset = ExplanationsDataset(expls, ["val"])
         self.test_dataset = ExplanationsDataset(expls, ["test"])
 
-        train_loader = DataLoader(self.train_dataset, batch_size=batch_size)
+        train_loader = DataLoader(self.train_dataset, batch_size=batch_size, pin_memory=True)
         val_loader = DataLoader(self.val_dataset, batch_size=64)
         test_loader = DataLoader(self.test_dataset, batch_size=64)
 
@@ -554,14 +555,16 @@ def learn_features_per_graph(expls, log=False):
     """
         Learn features for every graph via a graph classification task
     """
-    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=4)
-    gc_fw.train(log=True)
+    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16)
+    gc_fw.train(log=True, prefix=args.dataset)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
     print("Train graph classification acc/loss: ", round(acc,3), loss)
     print(confusion_matrix(gc_fw.train_dataset.data.y, preds))    
     acc , preds , loss = gc_fw.predict(gc_fw.test_loader, return_loss=True)
     print("Test graph classification acc/loss: ", round(acc,3), loss)
+    acc , preds , loss = gc_fw.predict(gc_fw.val_loader, return_loss=True)    
+    print("Val graph classification acc/loss: ", round(acc,3), loss)
 
     ret = defaultdict(lambda: defaultdict(list))
     for split in expls.keys():
@@ -615,9 +618,9 @@ if __name__ == "__main__":
     #plot_edge_weight_distribution_hist(expls)
 
     expls = preprocess_explanations(expls, cut_edges=args.cut_edges, cut_cc=args.cut_cc)
-    expls_unique = find_unique_explanations(expls, log=True)
+    #expls_unique = find_unique_explanations(expls, log=True)
 
-    plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
+    #plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
     
     ##
     # METHOD 1: Extract features
@@ -634,5 +637,5 @@ if __name__ == "__main__":
     ##
     # METHOD 2: Learn featues via graph classification
     ##
-    embs = learn_features_per_graph(expls_unique, log=True)
+    embs = learn_features_per_graph(expls, log=True)
     visualize_embeddings(embs, k=args.k)
