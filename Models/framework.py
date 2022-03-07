@@ -14,8 +14,8 @@ try:
 except ImportError:
     from utils import EarlyStopping
 
-#DATA_PATH = "C:/Users/Steve/Desktop/GNN/Data/"
-DATA_PATH = "/home/disi/Data/"
+DATA_PATH = "C:/Users/Steve/Desktop/GNN/Data/"
+#DATA_PATH = "/home/disi/Data/"
 
 
 class Framework:
@@ -270,15 +270,15 @@ class GraphClassificationFramework(Framework):
         if log_wandb:
             run = self.init_logger()
 
-        best_val_loss = 0
+        best_val_loss = np.inf
         val_acc , val_loss = 0 , 0
         for epoch in range(1, self.num_epochs+1):
             train_loss = self.train_epoch(log)
 
-            train_acc , _  = self.predict(self.train_loader, predict_type="train", return_loss=False)
-            test_acc  , _  = self.predict(self.test_loader, predict_type="test", return_loss=False)
+            train_acc , _  = self.predict(self.train_loader, return_loss=False)
+            test_acc  , _  = self.predict(self.test_loader, return_loss=False)
             if self.val_loader is not None:
-                val_acc , _ , val_loss = self.predict(self.val_loader, predict_type="val", return_loss=True)
+                val_acc , _ , val_loss = self.predict(self.val_loader, return_loss=True)
                 if val_loss <= best_val_loss:
                     self.save_model(prefix="best_so_far_")
                     best_val_loss = val_loss
@@ -309,9 +309,7 @@ class GraphClassificationFramework(Framework):
         return float(total_loss / len(self.train_loader))
 
     @torch.no_grad()
-    def predict(self, loader, predict_type="test", return_loss=False):
-        assert predict_type in ("train", "val", "test")
-
+    def predict(self, loader, return_loss=False):
         self.model.eval()
         total_correct ,  total_loss = 0 , 0
         preds = []
