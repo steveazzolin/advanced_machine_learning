@@ -1,5 +1,4 @@
 import argparse
-from async_timeout import timeout
 import torch
 import os
 from joblib import load as joblib_load
