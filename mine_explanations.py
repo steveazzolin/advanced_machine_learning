@@ -554,7 +554,7 @@ def learn_features_per_graph(expls, log=False):
     """
         Learn features for every graph via a graph classification task
     """
-    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16)
+    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=4)
     gc_fw.train(log=True, prefix=args.dataset)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
@@ -604,7 +604,7 @@ if __name__ == "__main__":
     elif args.dataset.upper() == "CITESEER":
         fw = models_CITESEER.getFrameworkByName(args.model.upper())
 
-    path = f"Explanations/{args.expl}/{args.dataset}/{args.model}/"
+    path = f"./Explanations/{args.expl}/{args.dataset}/{args.model}/"
     if args.time == "":
         args.time = get_last_experiment(path)
         print("Reading: ", args.time)
