@@ -125,11 +125,11 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
     """
         Pre-process the local explanations such as to cut irrelavant edges and/or remove connected components not including the target node
     """
-    print("Before preprocessing:")
-    for split in expls.keys():
-        print(split)
-        for c in expls[split].keys():
-            print(f"\t {c}: {len(expls[split][c])}")
+    # print("Before preprocessing:")
+    # for split in expls.keys():
+    #     print(split)
+    #     for c in expls[split].keys():
+    #         print(f"\t {c}: {len(expls[split][c])}")
 
     start = time.time()
     ret = defaultdict(lambda: defaultdict(list))
@@ -157,7 +157,7 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
                                 G_plot.remove_node(node)
                 if len(G_plot.nodes()) > 0:
                     ret[split][c].append((G_plot, node_idx))
-    print("Time: ", time.time() - start)    
+    #print("Time: ", time.time() - start)    
     return ret
 
 def plot_k_per_class(expls, labels, k):
@@ -505,7 +505,7 @@ class GECT_NET(torch.nn.Module):
 
 class ExplanationsDataset(InMemoryDataset):
     def __init__(self, expls, splits, model_name, dataset_name):
-        shutil.rmtree(f"tmp/{model_name}_{dataset_name}")
+        shutil.rmtree(f"tmp/{model_name}_{dataset_name}", ignore_errors=True)
         self.expls = expls
         self.splits = splits
         super().__init__(f"tmp/{model_name}_{dataset_name}", None, None, None)
@@ -556,7 +556,7 @@ def learn_features_per_graph(expls, model_name, dataset_name, log=False):
         Learn features for every graph via a graph classification task
     """
     gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16, model_name=model_name, dataset_name=dataset_name)
-    gc_fw.train(log=True, prefix=args.dataset)
+    gc_fw.train(log=False, prefix=model_name + "_" + dataset_name)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
     print("Train graph classification acc/loss: ", round(acc,3), loss)
