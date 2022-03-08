@@ -5,10 +5,14 @@ from joblib import load as joblib_load
 from collections import defaultdict
 from tqdm import tqdm
 import time
+import random
+import shutil
 
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.utils import from_networkx, to_networkx
 from torch_geometric.nn import global_add_pool, global_mean_pool
+from torch_geometric.nn import GINEConv
+from torch_geometric.loader import DataLoader
 
 from Models.framework import GraphClassificationFramework
 import Models.models_CORA as models_CORA
@@ -26,6 +30,7 @@ from sklearn_extra.cluster import KMedoids
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix
+
 
 NUM_EXPLS = 0
 def read_explanations(path, divide_per_split=False, labels=None, splits=None):
@@ -458,8 +463,8 @@ class GECT_NET(torch.nn.Module):
     """
         Model definition for the 'Graph Explanation Classification Task'
     """
-    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=500):
-        from torch_geometric.nn import GINEConv
+    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=50):
+        
         super().__init__()
 
         self.num_hidden = num_hidden
@@ -500,7 +505,6 @@ class GECT_NET(torch.nn.Module):
 
 class ExplanationsDataset(InMemoryDataset):
     def __init__(self, expls, splits):
-        import shutil
         shutil.rmtree('tmp/')
         self.expls = expls
         self.splits = splits
@@ -513,7 +517,6 @@ class ExplanationsDataset(InMemoryDataset):
         return ['explanation_graph.pt']
 
     def process(self):
-        from sklearn.preprocessing import StandardScaler
         data_list = []
 
         #construct data list
@@ -531,8 +534,6 @@ class ExplanationsDataset(InMemoryDataset):
 
 class ExplanationsClassificationFramework(GraphClassificationFramework):
     def __init__(self, expls, batch_size):
-        from torch_geometric.loader import DataLoader
-
         self.train_dataset = ExplanationsDataset(expls, ["train", "val"]) #join train and val to favor overfitting
         self.val_dataset = ExplanationsDataset(expls, ["val"])
         self.test_dataset = ExplanationsDataset(expls, ["test"])
@@ -554,7 +555,7 @@ def learn_features_per_graph(expls, log=False):
     """
         Learn features for every graph via a graph classification task
     """
-    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=4)
+    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16)
     gc_fw.train(log=True, prefix=args.dataset)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
@@ -574,6 +575,15 @@ def learn_features_per_graph(expls, log=False):
     return ret
 
 
+def seed_everything(seed=42):                                                  
+       random.seed(seed)                                                            
+       torch.manual_seed(seed)                 
+       torch.cuda.manual_seed_all(seed)                                             
+       np.random.seed(seed)                                                         
+       os.environ['PYTHONHASHSEED'] = str(seed)                                     
+       torch.backends.cudnn.deterministic = True                           
+       #torch.backends.cudnn.benchmark = False 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', default="", help='Model to use for explanations.')
@@ -585,7 +595,8 @@ if __name__ == "__main__":
     parser.add_argument('--cut_cc', action='store_true', default=False, help='Whether to cut the connected components not including the target node.')
     args = parser.parse_args()
     
-    torch.manual_seed(42)
+    #torch.manual_seed(42)
+    seed_everything(42)
 
     pretrained_models = [f.split(".")[0] for f in os.listdir("Pretrained models") if os.path.isfile(os.path.join("Pretrained models", f))]
     explainers = ["subgraphx", "pgexplainer"]
