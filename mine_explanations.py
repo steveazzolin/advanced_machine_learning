@@ -463,7 +463,7 @@ class GECT_NET(torch.nn.Module):
     """
         Model definition for the 'Graph Explanation Classification Task'
     """
-    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=50):
+    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=500):
         
         super().__init__()
 
@@ -504,11 +504,11 @@ class GECT_NET(torch.nn.Module):
 
 
 class ExplanationsDataset(InMemoryDataset):
-    def __init__(self, expls, splits):
-        shutil.rmtree('tmp/')
+    def __init__(self, expls, splits, model_name, dataset_name):
+        shutil.rmtree(f"tmp/{model_name}_{dataset_name}")
         self.expls = expls
         self.splits = splits
-        super().__init__("tmp/", None, None, None)
+        super().__init__(f"tmp/{model_name}_{dataset_name}", None, None, None)
         
         self.data , self.slices = self.process()
 
@@ -533,10 +533,10 @@ class ExplanationsDataset(InMemoryDataset):
         return self.collate(data_list)
 
 class ExplanationsClassificationFramework(GraphClassificationFramework):
-    def __init__(self, expls, batch_size):
-        self.train_dataset = ExplanationsDataset(expls, ["train", "val"]) #join train and val to favor overfitting
-        self.val_dataset = ExplanationsDataset(expls, ["val"])
-        self.test_dataset = ExplanationsDataset(expls, ["test"])
+    def __init__(self, expls, batch_size, model_name, dataset_name):
+        self.train_dataset = ExplanationsDataset(expls, ["train", "val"], model_name, dataset_name) #join train and val to favor overfitting
+        self.val_dataset = ExplanationsDataset(expls, ["val"], model_name, dataset_name)
+        self.test_dataset = ExplanationsDataset(expls, ["test"], model_name, dataset_name)
 
         train_loader = DataLoader(self.train_dataset, batch_size=batch_size, pin_memory=True)
         val_loader = DataLoader(self.val_dataset, batch_size=64)
@@ -551,11 +551,11 @@ class ExplanationsClassificationFramework(GraphClassificationFramework):
                         num_epochs=model.num_epochs, 
                         semi_sup=False)
 
-def learn_features_per_graph(expls, log=False):
+def learn_features_per_graph(expls, model_name, dataset_name, log=False):
     """
         Learn features for every graph via a graph classification task
     """
-    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16)
+    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16, model_name=model_name, dataset_name=dataset_name)
     gc_fw.train(log=True, prefix=args.dataset)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
@@ -582,7 +582,7 @@ def seed_everything(seed=42):
        np.random.seed(seed)                                                         
        os.environ['PYTHONHASHSEED'] = str(seed)                                     
        torch.backends.cudnn.deterministic = True                           
-       #torch.backends.cudnn.benchmark = False 
+       torch.backends.cudnn.benchmark = False 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -647,5 +647,5 @@ if __name__ == "__main__":
     ##
     # METHOD 2: Learn featues via graph classification
     ##
-    embs = learn_features_per_graph(expls, log=True)
+    embs = learn_features_per_graph(expls, args.model, args.dataset, log=True)
     visualize_embeddings(embs, k=args.k)
