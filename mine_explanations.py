@@ -29,7 +29,7 @@ import networkx as nx
 from sklearn_extra.cluster import KMedoids
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score
 
 
 NUM_EXPLS = 0
@@ -559,12 +559,12 @@ def learn_features_per_graph(expls, model_name, dataset_name, log=False):
     gc_fw.train(log=False, prefix=model_name + "_" + dataset_name)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
-    print("Train graph classification acc/loss: ", round(acc,3), loss)
+    print("Train graph classification acc/loss: ", round(acc,3), f1_score(gc_fw.train_loader.dataset.data.y, preds, average="macro"), loss)
     print(confusion_matrix(gc_fw.train_dataset.data.y, preds))    
     acc , preds , loss = gc_fw.predict(gc_fw.test_loader, return_loss=True)
-    print("Test graph classification acc/loss: ", round(acc,3), loss)
+    print("Test graph classification acc/loss: ", round(acc,3), f1_score(gc_fw.test_loader.dataset.data.y, preds, average="macro"), loss)
     acc , preds , loss = gc_fw.predict(gc_fw.val_loader, return_loss=True)    
-    print("Val graph classification acc/loss: ", round(acc,3), loss)
+    print("Val graph classification acc/loss: ", round(acc,3), f1_score(gc_fw.val_loader.dataset.data.y, preds, average="macro"), loss)
 
     ret = defaultdict(lambda: defaultdict(list))
     for split in expls.keys():
@@ -647,5 +647,5 @@ if __name__ == "__main__":
     ##
     # METHOD 2: Learn featues via graph classification
     ##
-    embs = learn_features_per_graph(expls_unique, args.model, args.dataset, log=True)
+    embs = learn_features_per_graph(expls, args.model, args.dataset, log=True)
     visualize_embeddings(embs, k=args.k)
