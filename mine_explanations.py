@@ -485,8 +485,8 @@ class GECT_NET(torch.nn.Module):
             torch.nn.Dropout(dropout)
         )        
 
-        self.conv1 = GINEConv(nn1, train_eps=True, edge_dim=1)
-        self.conv2 = GINEConv(nn2, train_eps=True, edge_dim=1)
+        self.conv1 = GINConv(nn1, train_eps=True)
+        self.conv2 = GINConv(nn2, train_eps=True) #, edge_dim=1
         self.lin = torch.nn.Linear(num_hidden[1] + num_hidden[0], num_classes)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd)
@@ -498,8 +498,8 @@ class GECT_NET(torch.nn.Module):
         return torch.nn.functional.log_softmax(x, dim=-1)
 
     def embedding(self, x, edge_index, edge_attr, batch):
-        x1 = self.conv1(x, edge_index, edge_attr)
-        x2 = self.conv2(x1, edge_index, edge_attr)
+        x1 = self.conv1(x, edge_index)
+        x2 = self.conv2(x1, edge_index)
         return torch.cat((global_add_pool(x1, batch), global_add_pool(x2, batch)), dim=1)
 
 
