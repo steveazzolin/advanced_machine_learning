@@ -555,7 +555,7 @@ def learn_features_per_graph(expls, model_name, dataset_name, log=False):
     """
         Learn features for every graph via a graph classification task
     """
-    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16, model_name=model_name, dataset_name=dataset_name)
+    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=4, model_name=model_name, dataset_name=dataset_name)
     gc_fw.train(log=False, prefix=model_name + "_" + dataset_name)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
@@ -628,7 +628,7 @@ if __name__ == "__main__":
     #plot_edge_weight_distribution_hist(expls)
 
     expls = preprocess_explanations(expls, cut_edges=args.cut_edges, cut_cc=args.cut_cc)
-    expls_unique = find_unique_explanations(expls, log=True)
+    #expls_unique = find_unique_explanations(expls, log=True)
 
     #plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
     
@@ -647,5 +647,5 @@ if __name__ == "__main__":
     ##
     # METHOD 2: Learn features via graph classification
     ##
-    embs = learn_features_per_graph(expls_unique, args.model, args.dataset, log=True)
+    embs = learn_features_per_graph(expls, args.model, args.dataset, log=True)
     visualize_embeddings(embs, k=args.k)
