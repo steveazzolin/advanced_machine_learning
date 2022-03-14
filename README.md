@@ -2,6 +2,8 @@
 
 This project is the final course project for the aforementioned course @ UNITN.
 
+A detailed description of the project can be found in `Report.pdf`
+
 ## Requisites
 - Create a *tmp* folder in the root directory
 - Import the conda env *env.yml*
