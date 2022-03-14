@@ -53,7 +53,7 @@ if __name__ == "__main__":
         num_epochs = 3
         fw = models_REDDIT.getFrameworkByName(args.model.upper(), batch_size=512, num_workers=4)
     elif args.dataset.upper() == "BASHAPES":
-        num_epochs = 40
+        num_epochs = 30 #check file for correct number of epochs
         fw = models_BAshapes.getFrameworkByName(args.model.upper())
     elif args.dataset.upper() == "CITESEER":
         num_epochs = 20
