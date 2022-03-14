@@ -685,7 +685,7 @@ if __name__ == "__main__":
     #plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
     
     ##
-    # METHOD 1: Extract features
+    # METHOD 1: Extract hand-crafted features features
     ##
     #embs = extract_features_per_graph(expls_unique, log=True)
     #visualize_embeddings(embs, k=args.k, name=args.dataset)
