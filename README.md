@@ -34,4 +34,4 @@ To extract the features of the local explanations, cutting irrelevant edges and 
 ```
 python mine_explanations.py --model=GCN --dataset=CORA --expl=PGExplainer --cut_edges --cut_cc
 ```
-The code above can also be sued to plot the local explanations, to plot the prototypes as found by the greedy Edit distance based algorithm, and to plot the edge scores distribution.
+The code above can also be used to plot the local explanations, to plot the prototypes as found by the greedy Edit distance based algorithm, and to plot the edge scores distribution.
