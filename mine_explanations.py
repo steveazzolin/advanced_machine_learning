@@ -47,9 +47,9 @@ def read_explanations(path, divide_per_split=False, labels=None, splits=None):
             else:
                 key = "all"
             for file in os.listdir(os.path.join(path, split, c)):
-                tmp = joblib_load(os.path.join(path, split, c, file))
+                WEIGHTS = joblib_load(os.path.join(path, split, c, file))
                 node_idx = int(file.split(".")[0])
-                data = tmp
+                data = WEIGHTS
                 if data.number_of_nodes() == 0 or (labels is not None and labels[node_idx] != int(c)):
                     n += 1
                     continue
@@ -87,11 +87,19 @@ def find_unique_explanations(expls, log=False):
                 print(f"\t {c}: {len(library[split][c])}")
     return library
 
-
+WEIGHTS = []
 def plot_single_graph(graph, ax):
     if nx.is_weighted(graph):
         edges , weights = zip(*nx.get_edge_attributes(graph, 'weight').items())
-        #weights = [(w)**2 for w in weights]
+        weights = np.array([(w) for w in weights])
+        weights = (weights - min(weights)) / (max(weights) - min(weights)+1e-20)
+        assert not np.any(np.isnan(weights))
+        
+        num_bins = 4
+        step = max(weights) / num_bins + 1e-20
+        weights = [int(w/step)+1 for w in weights]
+        WEIGHTS.extend(weights)
+        print(weights)
 
         # assign red color to the target node
         color_map = []
@@ -101,7 +109,7 @@ def plot_single_graph(graph, ax):
             else:
                 color_map.append("blue")
         pos = nx.spring_layout(graph, seed=42)
-        s = nx.draw(graph, pos, node_size=40, node_color=color_map, ax=ax, edge_color="blue")
+        s = nx.draw(graph, pos, node_size=40, node_color=color_map, ax=ax, edge_color="blue", width=weights)
     elif len(graph.nodes()) > 0:
         nx.draw(graph)
         print(graph)
@@ -121,15 +129,16 @@ def elbow_method(weights,):
             break
     return stop
 
-def preprocess_explanations(expls, cut_edges, cut_cc):
+def preprocess_explanations(expls, cut_edges, cut_cc, log=False):
     """
         Pre-process the local explanations such as to cut irrelavant edges and/or remove connected components not including the target node
     """
-    # print("Before preprocessing:")
-    # for split in expls.keys():
-    #     print(split)
-    #     for c in expls[split].keys():
-    #         print(f"\t {c}: {len(expls[split][c])}")
+    if log:
+        print("Before preprocessing:")
+        for split in expls.keys():
+            print(split)
+            for c in expls[split].keys():
+                print(f"\t {c}: {len(expls[split][c])}")
 
     start = time.time()
     ret = defaultdict(lambda: defaultdict(list))
@@ -141,7 +150,7 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
                 
                 stop = elbow_method(weights)
 
-                # build a tmp graph to be plotted
+                # build a WEIGHTS graph to be plotted
                 G_plot = nx.Graph(target_node=graph.graph["target_node"])
                 for j , i in enumerate(weights):
                     if not cut_edges or i >= stop:  
@@ -151,9 +160,9 @@ def preprocess_explanations(expls, cut_edges, cut_cc):
                 # remove connected components not including the target node
                 if cut_cc:
                     for component in list(nx.connected_components(G_plot)):
-                        tmp = list(component)
-                        if graph.graph["target_node"] not in tmp:
-                            for node in tmp:
+                        WEIGHTS = list(component)
+                        if graph.graph["target_node"] not in WEIGHTS:
+                            for node in WEIGHTS:
                                 G_plot.remove_node(node)
                 if len(G_plot.nodes()) > 0:
                     ret[split][c].append((G_plot, node_idx))
@@ -169,11 +178,14 @@ def plot_k_per_class(expls, labels, k):
     for i in range(rows):
         for j in range(cols):
             axs[i, j].axis("off")
+    c = 0
     for i in range(rows):
         for j , (elem , node_idx) in enumerate(expls["train"][str(i)][:cols]):
             d = diameter(elem) if nx.is_connected(elem) else 'nan'
             axs[i, j].set_title(f"lbl: {labels[int(node_idx)]} diam: {d}")
             plot_single_graph(elem, axs[i,j])
+            c += 1
+    print((sum(np.array(WEIGHTS) == 5) + sum(np.array(WEIGHTS) == 4) + sum(np.array(WEIGHTS) == 3)) / (len(WEIGHTS)))
     plt.show()
 
 def plot_edge_weight_distribution(expls, k):
@@ -333,8 +345,8 @@ def method2(expls, max_num_elements_per_class, upper_bound=20):
             for i in range(len(class_expls)):
                 m[i, i] = 0
                 for j in range(i+1, len(class_expls)):
-                    tmp = nx.graph_edit_distance(class_expls[i][0], class_expls[j][0], upper_bound=upper_bound, timeout=60)
-                    m[i, j] = tmp if tmp is not None else upper_bound
+                    WEIGHTS = nx.graph_edit_distance(class_expls[i][0], class_expls[j][0], upper_bound=upper_bound, timeout=60)
+                    m[i, j] = WEIGHTS if WEIGHTS is not None else upper_bound
                     m[j, i] = m[i, j]
 
             # apply filtering algorithm
@@ -347,8 +359,8 @@ def method2(expls, max_num_elements_per_class, upper_bound=20):
             # Plot metrics and results
             ##
             axs = plt.figure().subplots(1, 3)
-            tmp = axs[0].matshow(m)
-            #plt.colorbar(tmp, ax=axs[0])
+            WEIGHTS = axs[0].matshow(m)
+            #plt.colorbar(WEIGHTS, ax=axs[0])
             for i in range(len(m[0])):
                 for j in range(len(m[0])):
                     axs[0].text(i, j, str(m[i,j]), va='center', ha='center')
@@ -463,7 +475,7 @@ class GECT_NET(torch.nn.Module):
     """
         Model definition for the 'Graph Explanation Classification Task'
     """
-    def __init__(self, num_classes, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0, num_epochs=500):
+    def __init__(self, num_classes, num_epochs, num_features=5, num_hidden=[20, 2], dropout=0, lr=0.01, wd=0):
         
         super().__init__()
 
@@ -477,7 +489,6 @@ class GECT_NET(torch.nn.Module):
             torch.nn.LeakyReLU(),
             torch.nn.Dropout(dropout)
         )
-
         nn2 = torch.nn.Sequential(
             torch.nn.Linear(num_hidden[0], num_hidden[1]),
             torch.nn.BatchNorm1d(num_hidden[1]),
@@ -485,8 +496,8 @@ class GECT_NET(torch.nn.Module):
             torch.nn.Dropout(dropout)
         )        
 
-        self.conv1 = GINConv(nn1, train_eps=True)
-        self.conv2 = GINConv(nn2, train_eps=True) #, edge_dim=1
+        self.conv1 = GINEConv(nn1, train_eps=True, edge_dim=1)
+        self.conv2 = GINEConv(nn2, train_eps=True, edge_dim=1)
         self.lin = torch.nn.Linear(num_hidden[1] + num_hidden[0], num_classes)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd)
@@ -498,17 +509,23 @@ class GECT_NET(torch.nn.Module):
         return torch.nn.functional.log_softmax(x, dim=-1)
 
     def embedding(self, x, edge_index, edge_attr, batch):
-        x1 = self.conv1(x, edge_index)
-        x2 = self.conv2(x1, edge_index)
+        x1 = self.conv1(x, edge_index, edge_attr)
+        x2 = self.conv2(x1, edge_index, edge_attr)
         return torch.cat((global_add_pool(x1, batch), global_add_pool(x2, batch)), dim=1)
 
 
 class ExplanationsDataset(InMemoryDataset):
-    def __init__(self, expls, splits, model_name, dataset_name):
-        shutil.rmtree(f"tmp/{model_name}_{dataset_name}", ignore_errors=True)
+    def __init__(self, expls, splits, model_name, dataset_name, expls_other=None):
+        if type(model_name) == list:
+            folder_model_name = "_".join(model_name)
+        else:
+            folder_model_name = model_name
+
+        shutil.rmtree(f"tmp/{folder_model_name}_{dataset_name}", ignore_errors=True)
         self.expls = expls
+        self.expls_other = expls_other
         self.splits = splits
-        super().__init__(f"tmp/{model_name}_{dataset_name}", None, None, None)
+        super().__init__(f"tmp/{folder_model_name}_{dataset_name}", None, None, None)
         
         self.data , self.slices = self.process()
 
@@ -525,24 +542,38 @@ class ExplanationsDataset(InMemoryDataset):
                 for graph , node_idx in self.expls[split][c]:                    
                     data = from_networkx(graph)
                     data.edge_attr = torch.tensor(StandardScaler().fit_transform(data.weight.reshape(-1, 1)), dtype=torch.float).reshape(-1, 1)
-                    data.y = torch.tensor(int(c))
+                    data.y = torch.tensor(int(c)) if self.expls_other is None else torch.tensor(int(0))
                     data.x = torch.ones((data.num_nodes, 5), dtype=torch.float32)
                     #data.x[graph.graph["target_node"]] = 1
                     del data.weight
                     data_list.append(data)
+
+        if self.expls_other is not None:
+            for split in self.splits:
+                for c in self.expls_other[split].keys():
+                    for graph , node_idx in self.expls_other[split][c]:                    
+                        data = from_networkx(graph)
+                        data.edge_attr = torch.tensor(StandardScaler().fit_transform(data.weight.reshape(-1, 1)), dtype=torch.float).reshape(-1, 1)
+                        data.y = torch.tensor(1, dtype=torch.long)
+                        data.x = torch.ones((data.num_nodes, 5), dtype=torch.float32)
+                        del data.weight
+                        data_list.append(data)
         return self.collate(data_list)
 
 class ExplanationsClassificationFramework(GraphClassificationFramework):
-    def __init__(self, expls, batch_size, model_name, dataset_name):
-        self.train_dataset = ExplanationsDataset(expls, ["train", "val"], model_name, dataset_name) #join train and val to favor overfitting
-        self.val_dataset = ExplanationsDataset(expls, ["val"], model_name, dataset_name)
-        self.test_dataset = ExplanationsDataset(expls, ["test"], model_name, dataset_name)
+    def __init__(self, expls, batch_size, model_name, dataset_name, expls_other=None, num_epochs=500): 
+        train_splits = ["train", "val"]  
+        if expls_other is not None:
+            train_splits = ["train"]  
+        self.train_dataset = ExplanationsDataset(expls, train_splits, model_name, dataset_name, expls_other) #join train and val to favor overfitting
+        self.val_dataset = ExplanationsDataset(expls, ["val"], model_name, dataset_name, expls_other)
+        self.test_dataset = ExplanationsDataset(expls, ["test"], model_name, dataset_name, expls_other)
 
         train_loader = DataLoader(self.train_dataset, batch_size=batch_size, pin_memory=True)
         val_loader = DataLoader(self.val_dataset, batch_size=64)
         test_loader = DataLoader(self.test_dataset, batch_size=64)
 
-        model = GECT_NET(num_classes=len(torch.unique(self.train_dataset.data.y)))
+        model = GECT_NET(num_classes=len(torch.unique(self.train_dataset.data.y)), num_epochs=num_epochs)
         super().__init__(model=model, 
                         train_loader=train_loader, 
                         test_loader=test_loader, 
@@ -551,20 +582,20 @@ class ExplanationsClassificationFramework(GraphClassificationFramework):
                         num_epochs=model.num_epochs, 
                         semi_sup=False)
 
-def learn_features_per_graph(expls, model_name, dataset_name, log=False):
+def learn_features_per_graph(expls, model_name, dataset_name, num_epochs=500, log=False):
     """
         Learn features for every graph via a graph classification task
     """
-    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=4, model_name=model_name, dataset_name=dataset_name)
+    gc_fw = ExplanationsClassificationFramework(expls=expls, batch_size=16, model_name=model_name, dataset_name=dataset_name, num_epochs=num_epochs)
     gc_fw.train(log=False, prefix=model_name + "_" + dataset_name)
 
     acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
-    print("Train graph classification acc/loss: ", round(acc,3), f1_score(gc_fw.train_loader.dataset.data.y, preds, average="macro"), loss)
+    print("Train graph classification acc/f1/loss: ", round(acc,3), f1_score(gc_fw.train_loader.dataset.data.y, preds, average="macro"), loss)
     print(confusion_matrix(gc_fw.train_dataset.data.y, preds))    
     acc , preds , loss = gc_fw.predict(gc_fw.test_loader, return_loss=True)
-    print("Test graph classification acc/loss: ", round(acc,3), f1_score(gc_fw.test_loader.dataset.data.y, preds, average="macro"), loss)
+    print("Test graph classification acc/f1/loss: ", round(acc,3), f1_score(gc_fw.test_loader.dataset.data.y, preds, average="macro"), loss)
     acc , preds , loss = gc_fw.predict(gc_fw.val_loader, return_loss=True)    
-    print("Val graph classification acc/loss: ", round(acc,3), f1_score(gc_fw.val_loader.dataset.data.y, preds, average="macro"), loss)
+    print("Val graph classification acc/f1/loss: ", round(acc,3), f1_score(gc_fw.val_loader.dataset.data.y, preds, average="macro"), loss)
 
     ret = defaultdict(lambda: defaultdict(list))
     for split in expls.keys():
@@ -574,6 +605,27 @@ def learn_features_per_graph(expls, model_name, dataset_name, log=False):
                 pass
     return ret
 
+
+def learn_features_per_model(expls_first, expls_second, model_names, dataset_name, num_epochs, log=False):
+    """
+        Learn features for every graph via a graph classification task to classify each explanation into
+        the respective model for which the explanation was computed
+    """
+    gc_fw = ExplanationsClassificationFramework(expls=expls_first, 
+                                                expls_other=expls_second, 
+                                                batch_size=16, 
+                                                model_name=model_names, 
+                                                dataset_name=dataset_name, 
+                                                num_epochs=num_epochs)
+    gc_fw.train(log=log, prefix="_".join(model_names) + "_" + dataset_name)
+
+    acc , preds , loss = gc_fw.predict(gc_fw.train_loader, return_loss=True)    
+    print("Train graph classification acc/f1/loss: ", round(acc,3), f1_score(gc_fw.train_loader.dataset.data.y, preds, average="macro"), loss)
+    print(confusion_matrix(gc_fw.train_dataset.data.y, preds))    
+    acc , preds , loss = gc_fw.predict(gc_fw.test_loader, return_loss=True)
+    print("Test graph classification acc/f1/loss: ", round(acc,3), f1_score(gc_fw.test_loader.dataset.data.y, preds, average="macro"), loss)
+    acc , preds , loss = gc_fw.predict(gc_fw.val_loader, return_loss=True)    
+    print("Val graph classification acc/f1/loss: ", round(acc,3), f1_score(gc_fw.val_loader.dataset.data.y, preds, average="macro"), loss)
 
 def seed_everything(seed=42):                                                  
        random.seed(seed)                                                            
@@ -628,7 +680,7 @@ if __name__ == "__main__":
     #plot_edge_weight_distribution_hist(expls)
 
     expls = preprocess_explanations(expls, cut_edges=args.cut_edges, cut_cc=args.cut_cc)
-    #expls_unique = find_unique_explanations(expls, log=True)
+    expls_unique = find_unique_explanations(expls, log=True)
 
     #plot_k_per_class(expls_unique, labels=fw.dataset.data.y, k=args.k)
     
@@ -645,7 +697,24 @@ if __name__ == "__main__":
 
     
     ##
-    # METHOD 2: Learn features via graph classification
+    # METHOD 3: Learn features via graph classification
+    # Classify each explanation into its respective class
     ##
-    embs = learn_features_per_graph(expls, args.model, args.dataset, log=True)
-    visualize_embeddings(embs, k=args.k)
+    #embs = learn_features_per_graph(expls_unique, args.model, args.dataset, num_epochs=500, log=True)
+    
+
+
+    ##
+    # METHOD 4: Learn features via graph classification
+    # Classify each explanation as belonging either into GCN or GAT
+    ##
+    other_model = "GAT" if args.model == "GCN" else "GCN"
+    path = f"./Explanations/{args.expl}/{args.dataset.upper()}/{other_model}/"
+    args.time = get_last_experiment(path)
+    path += str(args.time)
+    
+    expls_other = read_explanations(path, divide_per_split=True, labels=fw.dataset.data.y, splits=["train", "val", "test"])
+    expls_other = preprocess_explanations(expls_other, cut_edges=args.cut_edges, cut_cc=args.cut_cc)
+    expls_unique_other = find_unique_explanations(expls_other, log=False)
+
+    embs = learn_features_per_model(expls_unique, expls_unique_other, ["GCN", "GAT"], args.dataset, log=True, num_epochs=200)
